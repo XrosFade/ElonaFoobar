@@ -1,0 +1,149 @@
+locale {
+    buff {
+        _1 {
+            name = "홀리 쉴드"
+            apply = "${name(_1)}에게 밝게 빛나는 방패가 씌워진다."
+            description = "PV를${_1}상승/공포에 내성"
+        }
+        _2 {
+            name = "침묵의 안개"
+            apply = "${name(_1)}는 흐린 안개에 뒤덮였다."
+            description = "마법을 못 쓰게 한다"
+        }
+        _3 {
+            name = "리제네레이션"
+            apply = "${name(_1)}의 회복능력이 활성화된다!"
+            description = "자연 회복력 강화"
+        }
+        _4 {
+            name = "원소보호"
+            apply = "${name(_1)}는 4대원소에 대한 내성을 얻었다."
+            description = "화염, 냉기, 전격내성을 얻는다."
+        }
+        _5 {
+            name = "가속"
+            apply = "${name(_1)}는 몸놀림이 재빨라졌다"
+            description ="${_1}가 빨라진다"
+        }
+        _6 {
+            name = "둔화"
+            apply = "${name(_1)}의 움직임이 느려졌다"
+            description ="${_1}을 느리게 한다"
+        }
+        _7 {
+            name = "영웅"
+            apply = "${name(_1)}의 사기가 높아졌다"
+            description = "근력, 민첩성을 ${_1} 상승/공포 내성/혼란 내성"
+        }
+        _8 {
+            name = "약화의 안개"
+            apply = "${name(_1)}는 허약해진다"
+            description = "DV와 PV를 반감시킨다"
+        }
+        _9 {
+            name = "원소의 흔적"
+            apply = "${name(_1)}은(는) 원소의 내성을 잃는다"
+            description = "화염, 냉기, 전격 내성을 약화시킨다"
+        }
+        _10 {
+            name = "홀리 베일"
+            apply = "${name(_1)}은(는) 성스러운 천에 감싸진다"
+            description = "파워${_1}의 저주(hex)에 저항한다"
+        }
+        _11 {
+            name = "나이트메어"
+            apply = "${name(_1)}는 악몽에 휩싸인다."
+            description = "신경, 환혹 내성을 감소"
+        }
+        _12 {
+            name = "현자의 가호"
+            apply = "${name(_1)}의 사고가 맑아진다"
+            description = "습득, 마력을 ${_1} 상승 / 독해를 ${_2} 상승"
+        }
+        _13 {
+            name = "천벌"
+            apply = "${name(_1)}에게 번개가 내리꽂힌다!",
+            description = "${_1}의 둔화/PV를${_2}%감소"
+        }
+        _14 {
+            name = "룰위의 빙의"
+            apply = "${name(_1)}에 룰위가 빙의한다!"
+            description ="${_1}가 매우 빨라진다."
+        }
+        _15 {
+            name = "변장"
+            apply = "${name(_1)}는 다른 것으로 변장했다"
+            description = "변장"
+        }
+        _16 {
+            name = "죽음의 선고"
+            apply = "${name(_1)}는 죽음의 선고를 받았다!"
+            description = "저주가 완료되었을 때 확실한 죽음이 찾아온다"
+        }
+        _17 {
+            name = "ブースト"
+            apply = "${name(_1)}はブーストした！"
+            description ="${_1}の加速と能力のアップ"
+        }
+        _18 {
+            name = "契約"
+            apply = "${name(_1)}は死神と契約した。"
+            description = "致命傷を負ったとき${_1}%の確率でダメージ分回復。"
+        }
+        _19 {
+            name = "幸運"
+            apply = "${name(_1)}に幸運な日が訪れた！"
+            description ="${_1}の幸運の上昇"
+        }
+        _20 {
+            name = "筋力の成長"
+            apply = ""
+            description = "筋力の成長率を${_1}%上昇"
+        }
+        _21 {
+            name = "耐久の成長"
+            apply = ""
+            description = "耐久の成長率を${_1}%上昇"
+        }
+        _22 {
+            name = "器用の成長"
+            apply = ""
+            description = "器用の成長率を${_1}%上昇"
+        }
+        _23 {
+            name = "感覚の成長"
+            apply = ""
+            description = "感覚の成長率を${_1}%上昇"
+        }
+        _24 {
+            name = "習得の成長"
+            apply = ""
+            description = "習得の成長率を${_1}%上昇"
+        }
+        _25 {
+            name = "意思の成長"
+            apply = ""
+            description = "意思の成長率を${_1}%上昇"
+        }
+        _26 {
+            name = "魔力の成長"
+            apply = ""
+            description = "魔力の成長率を${_1}%上昇"
+        }
+        _27 {
+            name = "魅力の成長"
+            apply = ""
+            description = "魅力の成長率を${_1}%上昇"
+        }
+        _28 {
+            name = "速度の成長"
+            apply = ""
+            description = "速度の成長率を${_1}%上昇"
+        }
+        _29 {
+            name = "運勢の成長"
+            apply = ""
+            description = "運勢の成長率を${_1}%上昇"
+        }
+    }
+}

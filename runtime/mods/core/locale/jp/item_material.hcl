@@ -13,7 +13,7 @@ locale {
             alias = ""
         }
         unknown_plant_seed {
-            name = "謎の物体"
+            name = "謎の植物"
             alias = ""
         }
         artifact_seed {

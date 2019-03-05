@@ -41,7 +41,7 @@ locale {
             alias = "old"
         }
         lead {
-            name = "iron"
+            name = "lead"
             alias = "heavy"
         }
         bronze {
@@ -57,8 +57,8 @@ locale {
             alias = "ocean"
         }
         iron {
-            name = "metal"
-            alias = "mass"
+            name = "iron"
+            alias = "ironsoul"
         }
         silver {
             name = "silver"

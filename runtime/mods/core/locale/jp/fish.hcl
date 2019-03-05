@@ -61,7 +61,7 @@ locale {
             name = "キレアジ"
         }
         moonfish {
-            name = "アロワナ"
+            name = "万鯛"
         }
         tuna_fish {
             name = "ハリマグロ"
