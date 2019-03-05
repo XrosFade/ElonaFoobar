@@ -1,7 +1,7 @@
 locale {
     item {
         bug {
-            name = "黄金"
+            name = "황금(버그)"
         }
         long_sword {
             name = "長剣"

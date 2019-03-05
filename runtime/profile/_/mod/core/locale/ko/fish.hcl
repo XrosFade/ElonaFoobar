@@ -1,119 +1,119 @@
 locale {
     fish {
         bug {
-            name = "バグ"
+            name = "버그"
         }
         goldfish {
-            name = "金魚"
+            name = "금붕어"
         }
         turtle {
-            name = "亀"
+            name = "거북이"
         }
         bitterling {
-            name = "ゼニタナゴ"
+            name = "납줄개"
         }
         tadpole {
-            name = "おたまじゃくし"
+            name = "올챙이"
         }
         swimming_trunks {
-            name = "海水パンツ"
+            name = "트렁크 수영복"
         }
         dirty_long_boots {
-            name = "小汚い長靴"
+            name = "더러운 장화"
         }
         carp {
-            name = "コイ"
+            name = "잉어"
         }
         eel {
-            name = "ウナギ"
+            name = "장어"
         }
         goby {
-            name = "ハゼ"
+            name = "망둥이"
         }
         sea_bream {
-            name = "キンメダイ"
+            name = "도미"
         }
         empty_can {
-            name = "空き缶"
+            name = "빈 깡통"
         }
         broken_machine {
-            name = "壊れた機械"
+            name = "망가진 기계"
         }
         sculpin {
-            name = "カジカ"
+            name = "둑중개"
         }
         sea_bass {
-            name = "スズキ"
+            name = "농어"
         }
         sea_urchin {
-            name = "ウニ"
+            name = "성게"
         }
         red_sea_bream {
-            name = "シロアマダイ"
+            name = "옥돔"
         }
         empty_bottle {
-            name = "空きビン"
+            name = "빈 병"
         }
         dirty_ring {
-            name = "汚い指輪"
+            name = "더러운 반지"
         }
         sword_fish {
-            name = "キレアジ"
+            name = "황새치"
         }
         moonfish {
-            name = "万鯛"
+            name = "붉평치"
         }
         tuna_fish {
-            name = "ハリマグロ"
+            name = "가다랑어"
         }
         ancient_fish {
-            name = "古代魚"
+            name = "고대어"
         }
         broken_umbrella {
-            name = "破れた傘"
+            name = "망가진 우산"
         }
         hairpiece {
-            name = "かつら"
+            name = "머리핀"
         }
         bonito {
-            name = "カツオ"
+            name = "줄삼치"
         }
         sweetfish {
-            name = "アユ"
+            name = "은어"
         }
         yellow_jack {
-            name = "シマアジ"
+            name = "부시리"
         }
         black_bass {
-            name = "ブラックバス"
+            name = "검정우럭"
         }
         ashore_from_north {
-            name = "北からの漂着物"
+            name = "북쪽에서 떠내려온 것"
         }
         pornographic_book {
-            name = "エロ本"
+            name = "야한 책"
         }
         mackerel {
-            name = "サバ"
+            name = "고등어"
         }
         big_tuna_fish {
-            name = "大食いマグロ"
+            name = "참다랑어"
         }
         remora {
-            name = "コバンザメ"
+            name = "빨판상어"
         }
         whale {
-            name = "クジラ"
+            name = "고래"
         }
         empty_box {
-            name = "空き箱"
+            name = "빈 상자"
         }
         broken_cell_phone {
-            name = "壊れた携帯"
+            name = "망가진 핸드폰"
         }
         # For debug
         strange_fish {
-            name = "謎のお魚"
+            name = "의문의 물고기"
         }
     }
 }

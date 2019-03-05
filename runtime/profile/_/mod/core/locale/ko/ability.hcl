@@ -34,7 +34,7 @@ locale {
             name = "속도"
         }
         attribute_luck {
-            name = "운세"
+            name = "운"
         }
         long_sword {
             name = "장검"

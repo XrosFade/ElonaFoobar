@@ -63,7 +63,7 @@ locale {
         _13 {
             name = "천벌"
             apply = "${name(_1)}에게 번개가 내리꽂힌다!",
-            description = "${_1}의 둔화/PV를${_2}%감소"
+            description = "${_1}의 둔화 / PV를${_2}%감소"
         }
         _14 {
             name = "룰위의 빙의"
@@ -81,69 +81,69 @@ locale {
             description = "저주가 완료되었을 때 확실한 죽음이 찾아온다"
         }
         _17 {
-            name = "ブースト"
-            apply = "${name(_1)}はブーストした！"
-            description ="${_1}の加速と能力のアップ"
+            name = "부스트"
+            apply = "${name(_1)}는 폭발적인 힘을 얻었다!"
+            description ="${_1}의 가속 및 능력상승"
         }
         _18 {
-            name = "契約"
-            apply = "${name(_1)}は死神と契約した。"
-            description = "致命傷を負ったとき${_1}%の確率でダメージ分回復。"
+            name = "계약"
+            apply = "${name(_1)}는 사신과의 계약을 맺었다"
+            description = "치명상을 입었을 때 ${_1}%의 확률로 받은 데미지만큼 회복한다."
         }
         _19 {
-            name = "幸運"
-            apply = "${name(_1)}に幸運な日が訪れた！"
-            description ="${_1}の幸運の上昇"
+            name = "행운"
+            apply = "${name(_1)}에게 행운의 날이 찾아왔다!"
+            description ="${_1}만큼의 행운이 상승"
         }
         _20 {
-            name = "筋力の成長"
+            name = "힘의 성장"
             apply = ""
-            description = "筋力の成長率を${_1}%上昇"
+            description = "힘의 성장률을 ${_1}% 상승"
         }
         _21 {
-            name = "耐久の成長"
+            name = "내구력의 성장"
             apply = ""
-            description = "耐久の成長率を${_1}%上昇"
+            description = "내구력의 성장률을 ${_1}% 상승"
         }
         _22 {
-            name = "器用の成長"
+            name = "민첩성의 성장"
             apply = ""
-            description = "器用の成長率を${_1}%上昇"
+            description = "민첩성의 성장률을 ${_1}% 상승"
         }
         _23 {
-            name = "感覚の成長"
+            name = "감각의 성장"
             apply = ""
-            description = "感覚の成長率を${_1}%上昇"
+            description = "감각의 성장률을 ${_1}% 상승"
         }
         _24 {
-            name = "習得の成長"
+            name = "습득의 성장"
             apply = ""
-            description = "習得の成長率を${_1}%上昇"
+            description = "습득의 성장률을 ${_1}% 상승"
         }
         _25 {
-            name = "意思の成長"
+            name = "의지의 성장"
             apply = ""
-            description = "意思の成長率を${_1}%上昇"
+            description = "의지의 성장률을 ${_1}% 상승"
         }
         _26 {
-            name = "魔力の成長"
+            name = "마력의 성장"
             apply = ""
-            description = "魔力の成長率を${_1}%上昇"
+            description = "마력의 성장률을 ${_1}% 상승"
         }
         _27 {
-            name = "魅力の成長"
+            name = "매력의 성장"
             apply = ""
-            description = "魅力の成長率を${_1}%上昇"
+            description = "매력의 성장률을 ${_1}% 상승"
         }
         _28 {
-            name = "速度の成長"
+            name = "속도의 성장"
             apply = ""
-            description = "速度の成長率を${_1}%上昇"
+            description = "속도의 성장률을 ${_1}% 상승"
         }
         _29 {
-            name = "運勢の成長"
+            name = "운의 성장"
             apply = ""
-            description = "運勢の成長率を${_1}%上昇"
+            description = "운의 성장률을 ${_1}% 상승"
         }
     }
 }
