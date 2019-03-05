@@ -11,7 +11,7 @@ set(PROJECT_VERSION_CODE 4)
 
 # Options
 option(ANDROID_BUNDLE_ASSETS "Bundle assets with Android distribution" OFF)
-option(ANDROID_GENERATE_PROPERTIES "Generate android/app/gradle.properties" OFF)
+option(ANDROID_GENERATE_BUILD_FILES "Generate android/app/gradle.properties and src/{elona,snail,util}/Android.mk" OFF)
 
 
 # Platform detection
@@ -48,12 +48,27 @@ set(PROJECT_VERSION_PLATFORM "${CMAKE_SYSTEM}")
 # Versioning file
 configure_file("${PROJECT_SOURCE_DIR}/src/version.cpp.in" "${PROJECT_SOURCE_DIR}/src/version.cpp")
 
+function(generate_android_mk target)
+  cmake_parse_arguments(ARGS "" "" "SOURCES" ${ARGN})
+  set(ANDROID_MK_TARGET ${target})
+  set(ANDROID_MK_SOURCES "LOCAL_SRC_FILES := \\\n")
+  foreach(SOURCE ${ARGS_SOURCES})
+    set(ANDROID_MK_SOURCES "${ANDROID_MK_SOURCES}${SOURCE} \\\n")
+  endforeach()
+  configure_file("${PROJECT_SOURCE_DIR}/src/${target}/Android.mk.in" "${PROJECT_SOURCE_DIR}/src/${target}/Android.mk")
+endfunction()
 
 
 # CMake is run last in the Android build process, so gradle.properties
-# has to be generated beforehand.
-if(ANDROID_GENERATE_PROPERTIES)
+# and Android.mk have to be generated beforehand.
+if(ANDROID_GENERATE_BUILD_FILES)
   configure_file("${PROJECT_SOURCE_DIR}/android/gradle.properties.in" "${PROJECT_SOURCE_DIR}/android/gradle.properties")
+
+  # Generate Android.mk
+  add_subdirectory(src/util)
+  add_subdirectory(src/snail)
+  add_subdirectory(src/elona)
+
   return()
 endif()
 
@@ -140,7 +155,7 @@ if(ANDROID)
   target_link_libraries(${PROJECT_NAME} android log SDL2 SDL2_image SDL2_ttf SDL2_mixer lua boost_filesystem boost_system boost_iostreams util snail elona)
 else()
   # Options
-  set(ELONA_BUILD_TARGET "GAME" CACHE STRING "Build executable type (GAME, TESTS, or BENCH)")
+  set(ELONA_BUILD_TARGET "GAME" CACHE STRING "Build executable type (GAME, LAUNCHER, TESTS, or BENCH)")
 
   if((ELONA_BUILD_TARGET STREQUAL "TESTS") OR (ELONA_BUILD_TARGET STREQUAL "BENCH"))
     set(SNAIL_HEADLESS ON)
@@ -210,6 +225,14 @@ else()
       set(RESOURCES "")
     endif()
     add_executable(${PROJECT_NAME} WIN32 src/main.cpp src/version.cpp ${RESOURCES})
+  elseif(ELONA_BUILD_TARGET STREQUAL "LAUNCHER")
+    if(WIN32)
+      set(RESOURCES "${PROJECT_SOURCE_DIR}/resources/icon_windows.rc")
+    else(WIN32)
+      set(RESOURCES "")
+    endif()
+    add_executable(${PROJECT_NAME} WIN32 src/launcher_main.cpp src/version.cpp ${RESOURCES})
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "Elona foobar Launcher")
   else()
     message(FATAL_ERROR "Unknown build mode: ${ELONA_BUILD_TARGET}")
   endif()
@@ -424,9 +447,13 @@ else()
 
   # My libraries: elona
   add_subdirectory(src/elona)
-  target_link_libraries(${PROJECT_NAME} elona)
+  if((ELONA_BUILD_TARGET STREQUAL "TESTS") OR (ELONA_BUILD_TARGET STREQUAL "BENCH"))
+    target_link_libraries(${PROJECT_NAME} elona snail_headless util)
+  else()
+    target_link_libraries(${PROJECT_NAME} elona snail util)
+  endif()
 
-  if(ELONA_BUILD_TARGET STREQUAL "GAME")
+  if((ELONA_BUILD_TARGET STREQUAL "GAME") OR (ELONA_BUILD_TARGET STREQUAL "LAUNCHER"))
     add_subdirectory(src/thirdparty/nfd)
     target_link_libraries(nfd)
   endif()
@@ -493,8 +520,7 @@ copy_dir(${CMAKE_SOURCE_DIR}/runtime/font/ "${RUNTIME_DIR}/font/")
 copy_dir(${CMAKE_SOURCE_DIR}/runtime/graphic/ "${RUNTIME_DIR}/graphic/")
 copy_dir(${CMAKE_SOURCE_DIR}/runtime/locale/ "${RUNTIME_DIR}/locale/")
 copy_dir(${CMAKE_SOURCE_DIR}/runtime/map/ "${RUNTIME_DIR}/map/")
-copy_dir(${CMAKE_SOURCE_DIR}/runtime/mods/ "${RUNTIME_DIR}/mods/")
-copy_dir(${CMAKE_SOURCE_DIR}/runtime/user/ "${RUNTIME_DIR}/user/")
+copy_dir(${CMAKE_SOURCE_DIR}/runtime/profile/ "${RUNTIME_DIR}/profile/")
 copy_file(${CMAKE_SOURCE_DIR}/runtime/assets.hcl "${RUNTIME_DIR}")
 
 # Copy assets from Elona 1.22 if they are present.

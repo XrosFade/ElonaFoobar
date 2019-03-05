@@ -43,6 +43,18 @@ build_release: $(BIN_DIR) FORCE # Build Elona foobar (release).
 	@echo "Something is placed at $(BIN_DIR)."
 
 
+launcher: FORCE # Build Elona foobar Launcher (debug)
+	cd $(BIN_DIR); \
+		cmake .. -DELONA_BUILD_TARGET=LAUNCHER -DCMAKE_BUILD_TYPE=Debug $(CMAKE_ARGS); \
+		cmake --build . --config Debug
+
+
+launcher_release: FORCE # Build Elona foobar Launcher (release)
+	cd $(BIN_DIR); \
+		cmake .. -DELONA_BUILD_TARGET=LAUNCHER -DCMAKE_BUILD_TYPE=Release $(CMAKE_ARGS); \
+		cmake --build . --config Release
+
+
 tests: test_runner FORCE # Run all tests.
 	cd $(BIN_DIR); \
 		./Elona_foobar --durations=yes
@@ -67,12 +79,12 @@ bench_runner: $(BIN_DIR) FORCE # Build benchmark runner.
 
 
 android: $(BIN_DIR) FORCE # Build android Elona foobar (debug).
-	cd $(BIN_DIR); cmake .. -DANDROID_GENERATE_PROPERTIES=ON
+	cd $(BIN_DIR); cmake .. -DANDROID_GENERATE_BUILD_FILES=ON
 	export TERM=xterm-color; cd android; ./gradlew assembleDebug; cp distribution/android/app/outputs/apk/debug/app-debug.apk ../$(APK)
 
 
 android_release: $(BIN_DIR) FORCE # Build android Elona foobar (release).
-	cd $(BIN_DIR); cmake .. -DANDROID_GENERATE_PROPERTIES=ON
+	cd $(BIN_DIR); cmake .. -DANDROID_GENERATE_BUILD_FILES=ON
 	export TERM=xterm-color; cd android; ./gradlew assembleRelease; cp distribution/android/app/outputs/apk/release/app-release-unsigned.apk ../$(APK_RELEASE)
 	@echo "\"You've been a faithful servant of me. Here, use it wisely.\""
 	@echo "Something is placed at $(BIN_DIR)."
@@ -95,23 +107,24 @@ format: FORCE # Format all C++ source files.
 	test -z "$$(git status --short)"
 
 
+docgen:
+	cargo run --release --manifest-path tools/docgen/Cargo.toml -- -f -o doc/api src/elona/lua_env
+
+
 ldoc: FORCE # Generate LDoc.
 	-@$(RM) -rf $(BIN_DIR)/doc
-	-@$(RM) -rf docs
+	-@$(RM) -rf doc/generated
 	mkdir -p $(BIN_DIR)/doc
-	cp doc/README.md $(BIN_DIR)/doc/readme.md
-	cp doc/ldoc.css $(BIN_DIR)/doc/ldoc.css
 	cp -r doc/topics $(BIN_DIR)/doc
 	cp -r doc/examples $(BIN_DIR)/doc
-	cp doc/uikit.min.css $(BIN_DIR)/doc/uikit.min.css
-	cp doc/putit.png $(BIN_DIR)/doc/putit.png
-	cd $(BIN_DIR) && ldoc -c ../doc/config.ld -l ../doc -s ../doc ../doc/api/
-	cp -r $(BIN_DIR)/doc docs
+	cp doc/static/* $(BIN_DIR)/doc/
+	cd $(BIN_DIR) && ldoc -c ../doc/config.ld -l ../doc -s ../doc/static ../doc/api/
+	cp -r $(BIN_DIR)/doc doc/generated
 
 
 luacheck: FORCE # Run luacheck.
 	luacheck --version
-	luacheck runtime/mods/
+	luacheck runtime/profile/_/mod/
 	luacheck src/tests/lua
 
 

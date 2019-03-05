@@ -3645,7 +3645,7 @@ void character_drops_item()
         }
     }
 
-    // ../runtime/mods/core/exports/impl/chara_drop.lua
+    // ../runtime/profile/_/mod/core/exports/impl/chara_drop.lua
     lua::call(
         "exports:core.impl.chara_drop.drop_from_chara", lua::handle(cdata[rc]));
 
@@ -4923,7 +4923,7 @@ void atxinit()
             {
                 sx = 192;
             }
-            gcopy(3, 496, 528, sx, inf_msgh, cnt * 192, 0);
+            draw_region("message_window", cnt * 192, 0, sx, inf_msgh);
         }
         window2(windoww - 208, 0, 208, 98, 0, 0);
         gcopy(
@@ -12039,7 +12039,7 @@ label_2684_internal:
             dx = 0;
         }
         gmode(2, 95);
-        gcopy_c(3, 456, 144, 344, 72, windoww / 2, y + 4, dx, 72);
+        draw_centered("scene_title", windoww / 2, y + 4, dx, 72);
     }
     x = 40;
     for (int cnt = 0, cnt_end = (noteinfo()); cnt < cnt_end; ++cnt)

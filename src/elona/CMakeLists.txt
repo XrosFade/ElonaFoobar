@@ -42,6 +42,7 @@ set(ELONA_SOURCES
   gdata.cpp
   get_card_info.cpp
   get_random_npc_id.cpp
+  globals.cpp
   god.cpp
   i18n.cpp
   init.cpp
@@ -142,7 +143,12 @@ set(ELONA_SOURCES
 
   pic_loader/pic_loader.cpp
 
+  profile/profile.cpp
   profile/profile_manager.cpp
   )
 
-add_library(elona STATIC ${ELONA_SOURCES})
+if(ANDROID_GENERATE_BUILD_FILES)
+  generate_android_mk(elona SOURCES ${ELONA_SOURCES})
+else()
+  add_library(elona STATIC ${ELONA_SOURCES})
+endif()
