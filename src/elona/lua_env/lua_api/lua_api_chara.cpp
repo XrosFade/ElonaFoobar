@@ -2,6 +2,7 @@
 #include "../../character.hpp"
 #include "../../lua_env/enums/enums.hpp"
 #include "../../lua_env/interface.hpp"
+#include "../../map.hpp"
 
 namespace elona
 {
@@ -15,15 +16,20 @@ namespace lua
  * @tparam LuaCharacter chara (const) a character
  * @treturn bool true if the character is alive
  */
-bool LuaApiChara::is_alive(LuaCharacterHandle chara)
+bool LuaApiChara::is_alive(sol::optional<LuaCharacterHandle> chara)
 {
-    if (!lua::lua->get_handle_manager().handle_is_valid(chara))
+    if (!chara)
     {
         return false;
     }
 
-    auto& chara_ref = lua::lua->get_handle_manager().get_ref<Character>(chara);
-    return chara_ref.state() == Character::State::alive;
+    auto chara_ref = lua::ref_opt<Character>(*chara);
+    if (!chara_ref)
+    {
+        return false;
+    }
+
+    return chara_ref->state() == Character::State::alive;
 }
 
 /**
@@ -35,21 +41,21 @@ bool LuaApiChara::is_alive(LuaCharacterHandle chara)
  */
 bool LuaApiChara::is_player(LuaCharacterHandle chara)
 {
-    auto& chara_ref = lua::lua->get_handle_manager().get_ref<Character>(chara);
+    auto& chara_ref = lua::ref<Character>(chara);
     return chara_ref.index == 0;
 }
 
 /**
  * @luadoc
  *
- * Checks if a character is a member of the player's party (has index < 16 and
+ * Checks if a character is a member of the player's party (has index < 16)
  * @tparam LuaCharacter chara (const) a character
  * @treturn bool true if the character is in the player's party
  */
 bool LuaApiChara::is_ally(LuaCharacterHandle chara)
 {
-    auto& chara_ref = lua::lua->get_handle_manager().get_ref<Character>(chara);
-    return !LuaApiChara::is_player(chara) && chara_ref.index <= 16;
+    auto& chara_ref = lua::ref<Character>(chara);
+    return !LuaApiChara::is_player(chara) && chara_ref.index < 16;
 }
 
 /**
@@ -65,46 +71,51 @@ int LuaApiChara::count()
 /**
  * @luadoc
  *
- * Gets a flag on a character.
- * @tparam LuaCharacter chara (const) the character to get the flag from
- * @tparam Enums.CharaFlag flag the flag to get
- */
-bool LuaApiChara::flag(LuaCharacterHandle chara, const EnumString& flag)
-{
-    auto& chara_ref = lua::lua->get_handle_manager().get_ref<Character>(chara);
-    int flag_value = LuaEnums::CharaFlagTable.ensure_from_string(flag);
-    return chara_ref._flags[flag_value] == 1;
-}
-
-/**
- * @luadoc
- *
  * Returns a reference to the player. They might not be alive.
  * @treturn LuaCharacter (mut) a reference to the player
  */
 sol::optional<LuaCharacterHandle> LuaApiChara::player()
 {
-    if (elona::cdata.player().state() == Character::State::empty)
+    return LuaApiChara::get(0);
+}
+
+/**
+ * @luadoc
+ *
+ * Returns the character at the given index.
+ * @treturn[1] LuaCharacter
+ * @treturn[2] nil
+ */
+sol::optional<LuaCharacterHandle> LuaApiChara::get(int index)
+{
+    if (index < 0 || index >= ELONA_MAX_CHARACTERS)
     {
         return sol::nullopt;
     }
-    else
-    {
-        return lua::handle(elona::cdata.player());
-    }
+
+    return lua::handle(elona::cdata[index]);
 }
 
-sol::optional<LuaCharacterHandle> LuaApiChara::create(
-    const Position& position,
-    int id)
+sol::optional<LuaCharacterHandle> LuaApiChara::create_random(
+    const Position& position)
 {
-    return LuaApiChara::create_xy(position.x, position.y, id);
+    return LuaApiChara::create_random_xy(position.x, position.y);
 }
 
-sol::optional<LuaCharacterHandle> LuaApiChara::create_xy(int x, int y, int id)
+
+/**
+ * @luadoc create
+ *
+ * Attempts to create a randomly generated character at a given position.
+ * Returns the character if creation succeeded, nil otherwise.
+ * @tparam LuaPosition position (const) position to create the character at
+ * @treturn[1] LuaCharacter the created character
+ * @treturn[2] nil
+ */
+sol::optional<LuaCharacterHandle> LuaApiChara::create_random_xy(int x, int y)
 {
     elona::flt();
-    if (elona::chara_create(-1, id, x, y) != 0)
+    if (elona::chara_create(-1, 0, x, y) != 0)
     {
         return lua::handle(elona::cdata[elona::rc]);
     }
@@ -134,12 +145,61 @@ sol::optional<LuaCharacterHandle> LuaApiChara::create_from_id(
 sol::optional<LuaCharacterHandle>
 LuaApiChara::create_from_id_xy(int x, int y, const std::string& id)
 {
-    auto data = the_character_db[id];
-    if (!data)
+    auto data = the_character_db.ensure(id);
+
+    if (elona::chara_create(-1, data.legacy_id, x, y) != 0)
     {
-        throw sol::error("No such character " + id);
+        return lua::handle(elona::cdata[elona::rc]);
     }
-    return LuaApiChara::create_xy(x, y, data->id);
+    else
+    {
+        return sol::nullopt;
+    }
+}
+
+sol::optional<LuaCharacterHandle> LuaApiChara::generate_from_map()
+{
+    return LuaApiChara::generate_from_map_xy(-3, 0);
+}
+
+sol::optional<LuaCharacterHandle> LuaApiChara::generate_from_map_pos(
+    const Position& pos)
+{
+
+    return LuaApiChara::generate_from_map_xy(pos.x, pos.y);
+}
+
+sol::optional<LuaCharacterHandle> LuaApiChara::generate_from_map_xy(
+    int x,
+    int y)
+{
+    dbid = 0;
+    map_set_chara_generation_filter();
+
+    if (elona::chara_create(-1, dbid, x, y) != 0)
+    {
+        return lua::handle(elona::cdata[elona::rc]);
+    }
+    else
+    {
+        return sol::nullopt;
+    }
+}
+
+sol::optional<LuaCharacterHandle> LuaApiChara::generate_from_map_id_pos(
+    const Position& pos,
+    const std::string& id)
+{
+
+    return LuaApiChara::generate_from_map_id_xy(pos.x, pos.y, id);
+}
+
+sol::optional<LuaCharacterHandle>
+LuaApiChara::generate_from_map_id_xy(int x, int y, const std::string& id)
+{
+    map_set_chara_generation_filter();
+
+    return LuaApiChara::create_from_id_xy(x, y, id);
 }
 
 /**
@@ -155,7 +215,89 @@ int LuaApiChara::kill_count(const std::string& id)
     {
         return 0;
     }
-    return npcmemory(0, data->id);
+    return npcmemory(0, data->legacy_id);
+}
+
+
+/**
+ * @luadoc
+ *
+ * Attempts to find a character with the given prototype ID.
+ * @tparam string id Prototype ID to search
+ * @tparam[opt] CharaFindLocation location Location to search in (defaults to
+ * others)
+ * @treturn[1] LuaCharacter the found character
+ * @treturn[2] nil
+ */
+sol::optional<LuaCharacterHandle> LuaApiChara::find(
+    const std::string& id,
+    sol::optional<EnumString> location)
+{
+    auto data = the_character_db[id];
+    if (!data)
+    {
+        return sol::nullopt;
+    }
+
+    auto location_value = CharaFindLocation::others;
+    if (location)
+    {
+        location_value =
+            LuaEnums::CharaFindLocationTable.ensure_from_string(*location);
+    }
+
+    int result = 0;
+    if (location_value == CharaFindLocation::allies)
+    {
+        result = chara_find_ally(data->legacy_id);
+
+        if (result == -1)
+        {
+            return sol::nullopt;
+        }
+    }
+    else
+    {
+        result = chara_find(data->legacy_id);
+
+        if (result == 0)
+        {
+            return sol::nullopt;
+        }
+    }
+
+    return lua::handle(elona::cdata[result]);
+}
+
+
+/**
+ * @luadoc
+ *
+ * Returns true if the player can recruit more allies, taking Charisma into
+ * account.
+ * @treturn bool
+ */
+bool LuaApiChara::can_recruit_allies()
+{
+    return chara_get_free_slot_ally() != 0;
+}
+
+
+/**
+ * @luadoc
+ *
+ * Removes a character from the player's party, if they are an ally.
+ * @tparam LuaCharacter ally
+ */
+void LuaApiChara::remove_from_party(LuaCharacterHandle ally)
+{
+    if (!LuaApiChara::is_ally(ally))
+    {
+        return;
+    }
+
+    auto& chara_ref = lua::ref<Character>(ally);
+    chara_relocate(chara_ref, none);
 }
 
 void LuaApiChara::bind(sol::table& api_table)
@@ -164,16 +306,27 @@ void LuaApiChara::bind(sol::table& api_table)
     LUA_API_BIND_FUNCTION(api_table, LuaApiChara, is_player);
     LUA_API_BIND_FUNCTION(api_table, LuaApiChara, is_ally);
     LUA_API_BIND_FUNCTION(api_table, LuaApiChara, count);
-    LUA_API_BIND_FUNCTION(api_table, LuaApiChara, flag);
+    LUA_API_BIND_FUNCTION(api_table, LuaApiChara, get);
     LUA_API_BIND_FUNCTION(api_table, LuaApiChara, player);
     api_table.set_function(
         "create",
         sol::overload(
-            LuaApiChara::create,
-            LuaApiChara::create_xy,
+            LuaApiChara::create_random,
+            LuaApiChara::create_random_xy,
             LuaApiChara::create_from_id,
             LuaApiChara::create_from_id_xy));
+    api_table.set_function(
+        "generate_from_map",
+        sol::overload(
+            LuaApiChara::generate_from_map,
+            LuaApiChara::generate_from_map_pos,
+            LuaApiChara::generate_from_map_xy,
+            LuaApiChara::generate_from_map_id_pos,
+            LuaApiChara::generate_from_map_id_xy));
     LUA_API_BIND_FUNCTION(api_table, LuaApiChara, kill_count);
+    LUA_API_BIND_FUNCTION(api_table, LuaApiChara, find);
+    LUA_API_BIND_FUNCTION(api_table, LuaApiChara, can_recruit_allies);
+    LUA_API_BIND_FUNCTION(api_table, LuaApiChara, remove_from_party);
 }
 
 } // namespace lua

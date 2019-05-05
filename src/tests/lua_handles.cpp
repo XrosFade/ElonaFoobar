@@ -669,7 +669,7 @@ TEST_CASE("Test validity check of lua reference userdata", "[Lua: Handles]")
     REQUIRE_NOTHROW(mod_mgr.run_in_mod("test_lua_ref", R"(
 local Chara = Elona.require("Chara")
 local chara = Chara.create(0, 0, "core.putit")
-local skill = chara:get_skill(10)
+local skill = chara:get_skill("core.attribute_strength")
 assert(skill.original_level > 0)
 
 local old_index = chara.index
@@ -679,4 +679,32 @@ assert(chara.index == old_index)
 
 assert(skill.original_level == 0)
 )"));
+}
+
+TEST_CASE(
+    "Test new handles are created when a map is generated",
+    "[Lua: Handles]")
+{
+    start_in_debug_map();
+
+    // fields
+    run_in_temporary_map(2, 0, []() {
+        REQUIRE(
+            elona::lua::lua->get_handle_manager().get_handle(
+                57, Character::lua_type()) != sol::lua_nil);
+    });
+}
+
+TEST_CASE(
+    "Test new handles are created when a map is loaded from a custom file",
+    "[Lua: Handles]")
+{
+    start_in_debug_map();
+
+    // vernis
+    run_in_temporary_map(5, 1, []() {
+        REQUIRE(
+            elona::lua::lua->get_handle_manager().get_handle(
+                57, Character::lua_type()) != sol::lua_nil);
+    });
 }

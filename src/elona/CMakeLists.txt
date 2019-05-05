@@ -28,8 +28,10 @@ set(ELONA_SOURCES
   ctrl_file.cpp
   ctrl_inventory.cpp
   debug.cpp
+  dialog.cpp
   dmgheal.cpp
   draw.cpp
+  draw_asset.cpp
   element.cpp
   elonacore.cpp
   enchantment.cpp
@@ -103,16 +105,17 @@ set(ELONA_SOURCES
   data/util.cpp
 
   lua_env/api_manager.cpp
+  lua_env/console.cpp
   lua_env/data_manager.cpp
   lua_env/event_manager.cpp
   lua_env/export_manager.cpp
   lua_env/handle_manager.cpp
   lua_env/i18n_function_manager.cpp
   lua_env/interface.cpp
-  lua_env/lua_console.cpp
   lua_env/lua_env.cpp
   lua_env/mod_manager.cpp
   lua_env/mod_manifest.cpp
+  lua_env/mod_serializer.cpp
 
   lua_env/enums/enums.cpp
 
@@ -120,18 +123,19 @@ set(ELONA_SOURCES
 
   lua_env/lua_class/lua_class.cpp
   lua_env/lua_class/lua_class_ability.cpp
+  lua_env/lua_class/lua_class_area.cpp
   lua_env/lua_class/lua_class_character.cpp
+  lua_env/lua_class/lua_class_date_time.cpp
+  lua_env/lua_class/lua_class_game_data.cpp
   lua_env/lua_class/lua_class_item.cpp
+  lua_env/lua_class/lua_class_map_data.cpp
+  lua_env/lua_class/lua_class_map_generator.cpp
   lua_env/lua_class/lua_class_position.cpp
 
   config/config.cpp
   config/config_def.cpp
   config/set_option.cpp
   config/create_config_screen.cpp
-
-  dialog/dialog.cpp
-  dialog/dialog_data.cpp
-  dialog/dialog_decoder.cpp
 
   keybind/input_context.cpp
   keybind/key_names.cpp
@@ -140,8 +144,10 @@ set(ELONA_SOURCES
   keybind/keybind_deserializer.cpp
   keybind/keybind_manager.cpp
   keybind/keybind_serializer.cpp
+  keybind/macro_action_queue.cpp
 
   pic_loader/pic_loader.cpp
+  pic_loader/tinted_buffers.cpp
 
   profile/profile.cpp
   profile/profile_manager.cpp

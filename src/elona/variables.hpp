@@ -300,7 +300,6 @@ ELONA_EXTERN(elona_vector2<int> adata);
 ELONA_EXTERN(elona_vector2<int> breathlist);
 ELONA_EXTERN(elona_vector2<int> c_col);
 ELONA_EXTERN(elona_vector2<int> card);
-ELONA_EXTERN(elona_vector2<int> chipm);
 ELONA_EXTERN(elona_vector2<int> cmapdata);
 ELONA_EXTERN(elona_vector2<int> cycle);
 ELONA_EXTERN(elona_vector2<int> dblist);
@@ -771,7 +770,7 @@ int key_direction(const std::string& action);
 
 // Querying input
 int ask_direction();
-int target_position();
+int target_position(bool target_chara = true);
 int prompt_magic_location();
 int prompt_really_attack();
 
@@ -869,7 +868,7 @@ void damage_by_cursed_equipments();
 //// proc_movement_event
 TurnResult proc_movement_event();
 void map_global_proc_travel_events();
-void proc_trap();
+void move_character();
 void sense_map_feats_on_move();
 
 
@@ -909,7 +908,6 @@ int mapitemfind(int = 0, int = 0, int = 0);
 
 // Map drawing
 void cell_draw();
-void map_prepare_tileset_atlas();
 void addefmap(int = 0, int = 0, int = 0, int = 0, int = 0, int = 0);
 
 // Map animation
@@ -943,7 +941,6 @@ void initialize_random_nefia_rdtype8();
 void initialize_random_nefia_rdtype9();
 void mapgen_dig_maze();
 void initialize_random_nefia_rdtype10();
-void initialize_home_mdata();
 
 
 //// weather_changes

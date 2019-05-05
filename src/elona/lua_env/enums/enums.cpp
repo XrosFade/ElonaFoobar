@@ -155,6 +155,7 @@ EnumMap<Element> ElementTable{"Element",
                                   {"Cut", Element::cut},
                                   {"Ether", Element::ether},
                                   {"Acid", Element::acid},
+                                  {"Vorpal", Element::vorpal},
                               }};
 
 
@@ -271,14 +272,14 @@ EnumMap<int> GenderTable{"Gender",
  *
  * Relationship of a character to the player.
  */
-EnumMap<int> RelationTable{"Relation",
-                           {
-                               {"Aggressive", -3},
-                               {"Nonaggressive", -2},
-                               {"Unconcerned", -1},
-                               {"Neutral", 0},
-                               {"Friend", 10},
-                           }};
+EnumMap<int> RelationshipTable{"Relationship",
+                               {
+                                   {"Aggressive", -3},
+                                   {"Nonaggressive", -2},
+                                   {"Unconcerned", -1},
+                                   {"Neutral", 0},
+                                   {"Friend", 10},
+                               }};
 
 
 /**
@@ -342,7 +343,7 @@ EnumMap<int> CharaFlagTable{
         {"IsLordOfDungeon", 976},
         {"HasOwnName", 977},
         {"IsPregnant", 978},
-        {"DoesNotSearchEnemy", 979},
+        {"IsNotAttackedByEnemy", 979},
         {"IsContractingWithReaper", 980},
         {"NeedsRefreshingStatus", 981},
         {"VisitedJustNow", 982},
@@ -372,6 +373,66 @@ EnumMap<int> TraitTypeTable{"TraitType",
                                 {"EtherDisease", 3},
                             }};
 
+/**
+ * @luadoc
+ *
+ * Location to search for characters using Chara.find.
+ * @see Chara.find
+ */
+EnumMap<CharaFindLocation> CharaFindLocationTable{
+    "CharaFindLocation",
+    {
+        {"Allies", CharaFindLocation::allies},
+        {"Others", CharaFindLocation::others},
+    }};
+
+/**
+ * @luadoc
+ *
+ * Location to search for items using Item.find.
+ * @see Item.find
+ */
+EnumMap<ItemFindLocation> ItemFindLocationTable{
+    "ItemFindLocation",
+    {
+        {"PlayerInventory", ItemFindLocation::player_inventory},
+        {"Ground", ItemFindLocation::ground},
+        {"PlayerInventoryAndGround",
+         ItemFindLocation::player_inventory_and_ground},
+    }};
+
+/**
+ * @luadoc
+ *
+ * Operation to use with Input.choose_ally.
+ * @see Input.choose_ally
+ */
+EnumMap<ControlAllyOperation> ControlAllyOperationTable{
+    "ControlAllyOperation",
+    {
+        {"CallBack", ControlAllyOperation::call_back},
+        {"Sell", ControlAllyOperation::sell},
+        {"PetArena", ControlAllyOperation::pet_arena},
+        {"Staying", ControlAllyOperation::staying},
+        {"Investigate", ControlAllyOperation::investigate},
+        {"GeneEngineer", ControlAllyOperation::gene_engineer},
+    }};
+
+/**
+ * @luadoc
+ *
+ * Title type to use with World.random_title.
+ * @see World.random_title
+ */
+EnumMap<RandomTitleType> RandomTitleTypeTable{
+    "RandomTitleType",
+    {
+        {"Character", RandomTitleType::character},
+        {"Weapon", RandomTitleType::weapon},
+        {"Party", RandomTitleType::party},
+        {"LivingWeapon", RandomTitleType::living_weapon},
+    }};
+
 } // namespace LuaEnums
 
 void LuaEnums::bind(sol::table& core)
@@ -389,10 +450,14 @@ void LuaEnums::bind(sol::table& core)
     MapEntranceTypeTable.bind(Enums);
     MapTilesetTable.bind(Enums);
     GenderTable.bind(Enums);
-    RelationTable.bind(Enums);
+    RelationshipTable.bind(Enums);
     CharaFlagTable.bind(Enums);
     QualityTable.bind(Enums);
     TraitTypeTable.bind(Enums);
+    CharaFindLocationTable.bind(Enums);
+    ItemFindLocationTable.bind(Enums);
+    ControlAllyOperationTable.bind(Enums);
+    RandomTitleTypeTable.bind(Enums);
 }
 
 } // namespace lua

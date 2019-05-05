@@ -4,9 +4,15 @@
 #include <memory>
 #include <vector>
 #include "../util/range.hpp"
+#include "data/types/type_item.hpp"
 #include "enums.hpp"
 #include "position.hpp"
+#include "shared_id.hpp"
 
+
+#define ELONA_OTHER_INVENTORIES_INDEX 1320
+#define ELONA_ITEM_ON_GROUND_INDEX 5080
+#define ELONA_MAX_ITEMS 5480
 
 
 namespace elona
@@ -169,6 +175,11 @@ public:
     void modify_number(int delta);
     void remove();
 
+    SharedId new_id() const
+    {
+        return *the_item_db.get_id_from_legacy(this->id);
+    }
+
 
 #define ELONA_ITEM_DEFINE_FLAG_ACCESSOR(name, n) \
     bool name() const \
@@ -262,7 +273,18 @@ void item_set_num(Item&, int);
 void itemturn(int = 0);
 int itemfind(int = 0, int = 0, int = 0);
 int itemusingfind(int, bool = false);
-int item_find(int = 0, int = 0, int = 0);
+
+enum class ItemFindLocation
+{
+    player_inventory,
+    ground,
+    player_inventory_and_ground,
+};
+int item_find(
+    int = 0,
+    int = 0,
+    ItemFindLocation = ItemFindLocation::player_inventory_and_ground);
+
 int item_separate(int);
 int item_stack(int = 0, int = 0, int = 0);
 void item_dump_desc(const Item&);

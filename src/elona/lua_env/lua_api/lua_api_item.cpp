@@ -37,7 +37,7 @@ int LuaApiItem::count()
  */
 bool LuaApiItem::has_enchantment(const LuaItemHandle item, int enchantment_id)
 {
-    auto& item_ref = lua::lua->get_handle_manager().get_ref<Item>(item);
+    auto& item_ref = lua::ref<Item>(item);
     return encfindspec(item_ref.index, enchantment_id);
 }
 
@@ -53,7 +53,7 @@ bool LuaApiItem::has_enchantment(const LuaItemHandle item, int enchantment_id)
 std::string
 LuaApiItem::itemname(LuaItemHandle item, int number, bool use_article)
 {
-    auto& item_ref = lua::lua->get_handle_manager().get_ref<Item>(item);
+    auto& item_ref = lua::ref<Item>(item);
     return elona::itemname(item_ref.index, number, use_article ? 0 : 1);
 }
 
@@ -176,6 +176,11 @@ LuaApiItem::create_xy(int x, int y, sol::table args)
         flttypeminor = *it;
     }
 
+    if (auto it = args.get<sol::optional<int>>("fltselect"))
+    {
+        fltselect = *it;
+    }
+
     if (auto it = args.get<sol::optional<std::string>>("fltn"))
     {
         fltn(*it);
@@ -183,12 +188,8 @@ LuaApiItem::create_xy(int x, int y, sol::table args)
 
     if (auto it = args.get<sol::optional<std::string>>("id"))
     {
-        auto data = the_item_db[*it];
-        if (!data)
-        {
-            throw sol::error("No such item " + *it);
-        }
-        id = data->id;
+        auto data = the_item_db.ensure(*it);
+        id = data.legacy_id;
     }
 
     if (itemcreate(slot, id, x, y, number) != 0)
@@ -223,7 +224,7 @@ int LuaApiItem::memory(int type, const std::string& id)
         return 0;
     }
 
-    return itemmemory(type, data->id);
+    return itemmemory(type, data->legacy_id);
 }
 
 /**
@@ -245,7 +246,7 @@ sol::optional<LuaItemHandle> LuaApiItem::stack(
         return sol::nullopt;
     }
 
-    auto& item_ref = lua::lua->get_handle_manager().get_ref<Item>(handle);
+    auto& item_ref = lua::ref<Item>(handle);
 
     int tibk = ti;
     item_stack(inventory_id, item_ref.index);
@@ -269,7 +270,7 @@ sol::optional<LuaItemHandle> LuaApiItem::stack(
  */
 int LuaApiItem::trade_rate(LuaItemHandle handle)
 {
-    auto& item_ref = lua::lua->get_handle_manager().get_ref<Item>(handle);
+    auto& item_ref = lua::ref<Item>(handle);
 
     // Item must be in the cargo category.
     if (the_item_db[item_ref.id]->category != 92000)
@@ -278,6 +279,44 @@ int LuaApiItem::trade_rate(LuaItemHandle handle)
     }
 
     return trate(item_ref.param1);
+}
+
+/**
+ * @luadoc
+ *
+ * Tries to find an item in the player's inventory, the ground, or both.
+ * @tparam string item_id The item ID to find.
+ * @tparam ItemFindLocation location Where to search for the item.
+ */
+sol::optional<LuaItemHandle> LuaApiItem::find(
+    const std::string& item_id,
+    const EnumString& location)
+{
+    auto data = the_item_db.ensure(item_id);
+
+    auto location_value =
+        LuaEnums::ItemFindLocationTable.ensure_from_string(location);
+
+    auto stat = item_find(data.legacy_id, 3, location_value);
+    if (stat == -1)
+    {
+        return sol::nullopt;
+    }
+
+    return lua::handle(inv[stat]);
+}
+
+
+/**
+ * @luadoc
+ *
+ * Returns the string representation of a weight value.
+ * @tparam num weight The weight value
+ * @treturn string
+ */
+std::string LuaApiItem::weight_string(int weight)
+{
+    return cnvweight(weight);
 }
 
 void LuaApiItem::bind(sol::table& api_table)
@@ -297,6 +336,8 @@ void LuaApiItem::bind(sol::table& api_table)
     LUA_API_BIND_FUNCTION(api_table, LuaApiItem, memory);
     LUA_API_BIND_FUNCTION(api_table, LuaApiItem, stack);
     LUA_API_BIND_FUNCTION(api_table, LuaApiItem, trade_rate);
+    LUA_API_BIND_FUNCTION(api_table, LuaApiItem, find);
+    LUA_API_BIND_FUNCTION(api_table, LuaApiItem, weight_string);
 }
 
 } // namespace lua

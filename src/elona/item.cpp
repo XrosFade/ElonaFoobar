@@ -89,7 +89,7 @@ bool Item::almost_equals(const Item& other, bool ignore_position)
 }
 
 Inventory::Inventory()
-    : storage(5480)
+    : storage(ELONA_MAX_ITEMS)
 {
     for (size_t i = 0; i < storage.size(); ++i)
     {
@@ -115,7 +115,22 @@ range::iota<int> items(int owner)
 
 
 
-int item_find(int matcher, int matcher_type, int inventory_type)
+/**
+ * Tries to find an item in the player's inventory, the ground, or both. Returns
+ * the item's index, or -1 if not found.
+ *
+ * Valid values of @ref matcher_type:
+ *   0: By category
+ *   1: By skill
+ *   2: By subcategory
+ *   3: By ID
+ *
+ * Valid values of @ref inventory_type:
+ *   -1: On ground
+ *    0: Both player's inventory and on ground
+ *    1: Player's inventory
+ */
+int item_find(int matcher, int matcher_type, ItemFindLocation location_type)
 {
     elona_vector1<int> p_at_m52;
     p_at_m52(0) = -1;
@@ -126,7 +141,7 @@ int item_find(int matcher, int matcher_type, int inventory_type)
         int invrange;
         if (cnt == 0)
         {
-            if (inventory_type > 0)
+            if (location_type == ItemFindLocation::player_inventory)
             {
                 continue;
             }
@@ -136,7 +151,7 @@ int item_find(int matcher, int matcher_type, int inventory_type)
         }
         else
         {
-            if (inventory_type < 0)
+            if (location_type == ItemFindLocation::ground)
             {
                 continue;
             }
@@ -430,13 +445,14 @@ void cell_refresh(int x, int y)
             }
         }
         cell_data.at(x, y).item_appearances_actual =
-            floorstack(n_at_m55(0)) - 5080;
+            floorstack(n_at_m55(0)) - ELONA_ITEM_ON_GROUND_INDEX;
         cell_data.at(x, y).item_appearances_actual +=
-            (floorstack(n_at_m55(1)) - 5080) * 1000;
+            (floorstack(n_at_m55(1)) - ELONA_ITEM_ON_GROUND_INDEX) * 1000;
         if (p_at_m55 > 2)
         {
             cell_data.at(x, y).item_appearances_actual +=
-                (floorstack(n_at_m55(2)) - 5080) * 1000000;
+                (floorstack(n_at_m55(2)) - ELONA_ITEM_ON_GROUND_INDEX) *
+                1000000;
         }
         else
         {
@@ -521,7 +537,7 @@ void item_refresh(Item& i)
     {
         i.remove();
     }
-    if (i.index >= 5080 && mode != 6)
+    if (i.index >= ELONA_ITEM_ON_GROUND_INDEX && mode != 6)
     {
         // Refresh the cell the item is on if it's on the ground.
         cell_refresh(i.position.x, i.position.y);
@@ -2071,7 +2087,7 @@ std::pair<int, int> inv_getheader(int owner)
     }
     else if (owner == -1)
     {
-        return {5080, 400};
+        return {ELONA_ITEM_ON_GROUND_INDEX, 400};
     }
     else
     {
@@ -2087,7 +2103,7 @@ int inv_getowner(int inv_id)
     {
         return 0;
     }
-    if (inv_id >= 5080)
+    if (inv_id >= ELONA_ITEM_ON_GROUND_INDEX)
     {
         return -1;
     }

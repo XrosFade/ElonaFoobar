@@ -5,11 +5,16 @@
 --  @function remove
 function remove() end
 
+--- Changes the material of this item.
+--  @tparam string material_id ID of the item material
+--  @function change_material
+function change_material(material_id) end
+
 --- [R] The index of this item in the global items array.
 --  @tfield num index
 
---- [R] The prototype ID of this item.
---  @tfield num id
+--- [R] The legacy ID of this item.
+--  @tfield num legacy_id
 
 --- [RW] The item's position.
 --  @tfield num position
@@ -39,8 +44,21 @@ function remove() end
 --- [RW] A generic parameter.
 --  @tfield num param4
 
---- [R] The new version prototype ID of the item.
---  @tfield num new_id
+--- [RW] Controls the ownership of this item.
+--  <code>-2</code>: Item was dropped by the player on death
+--  <code>0</code>: Normal, can be picked up by the player
+--  <code>1</code>: Not owned ("It's not your property", etc.)
+--  <code>2</code>: Not carryable (shopkeeper's trunk).
+--  <code>3</code>: Built shelter
+--  <code>4</code>: Harvestable item in harvest quests
+--  @tfield num own_state
+
+--- [R] The material ID of this item. To change it, use
+--  LuaItem.change_material.
+--  @tfield string material
+
+--- [R] The new-style prototype ID of the item.
+--  @tfield string id
 
 --- [R] The name of the item with article and number.
 --  @tfield string name
@@ -56,3 +74,6 @@ function remove() end
 
 --- [RW] The identify state of this item.
 --  @tfield IdentifyState identify_state
+
+--- [R] The prototype data of the character.
+--  @tfield table prototype

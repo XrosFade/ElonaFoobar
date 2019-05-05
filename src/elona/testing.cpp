@@ -12,6 +12,7 @@
 #include "log.hpp"
 #include "lua_env/event_manager.hpp"
 #include "lua_env/lua_env.hpp"
+#include "lua_env/lua_event/base_event.hpp"
 #include "profile/profile_manager.hpp"
 #include "save.hpp"
 #include "variables.hpp"
@@ -51,11 +52,19 @@ void load_previous_savefile()
     initialize_map();
 }
 
-void save_and_reload()
+void save_reset_and_reload()
 {
     filesystem::dir::set_base_save_directory(filesystem::path(save_dir));
     save_game();
     elona::testing::reset_state();
+    elona::firstturn = 1;
+    load_save_data();
+}
+
+void save_and_reload()
+{
+    filesystem::dir::set_base_save_directory(filesystem::path(save_dir));
+    save_game();
     elona::firstturn = 1;
     load_save_data();
 }
@@ -100,10 +109,13 @@ void start_in_map(int map, int level)
     elona::playerid = player_id;
     fs::remove_all(filesystem::dir::save(player_id));
 
-    game_data.current_map = map; // Debug map
+    game_data.current_map = map;
     game_data.current_dungeon_level = level;
     init_fovlist();
+    elona::mode = 2;
     initialize_map();
+
+    save_game();
 }
 
 void start_in_debug_map()
@@ -111,21 +123,27 @@ void start_in_debug_map()
     start_in_map(499, 2);
 }
 
-void run_in_temporary_map(int map, int level, std::function<void()> f)
+void run_in_temporary_map(int map, int dungeon_level, std::function<void()> f)
 {
-    game_data.previous_map2 = game_data.current_map;
-    game_data.previous_dungeon_level = game_data.current_dungeon_level;
-    game_data.previous_x = cdata.player().position.x;
-    game_data.previous_y = cdata.player().position.y;
+    auto previous_map = game_data.current_map;
+    auto previous_dungeon_level = game_data.current_dungeon_level;
+    auto previous_x = cdata.player().position.x;
+    auto previous_y = cdata.player().position.y;
     game_data.destination_map = map;
-    game_data.destination_dungeon_level = level;
-    levelexitby = 2;
+    game_data.destination_dungeon_level = dungeon_level;
+    elona::levelexitby = 2;
     exit_map();
+    initialize_map();
 
     f();
 
-    levelexitby = 4;
+    elona::mapstartx = previous_x;
+    elona::mapstarty = previous_y;
+    game_data.destination_map = previous_map;
+    game_data.destination_dungeon_level = previous_dungeon_level;
+    elona::levelexitby = 2;
     exit_map();
+    initialize_map();
 }
 
 void pre_init()
@@ -133,12 +151,10 @@ void pre_init()
     log::Logger::instance().init();
     profile::ProfileManager::instance().init(u8"testing");
 
-    const fs::path config_def_file =
-        filesystem::dir::mod() / u8"core"s / u8"config"s / u8"config_def.hcl"s;
     const fs::path config_file =
         filesystem::dir::exe() / "tests/data/config.hcl";
 
-    Config::instance().init(config_def_file);
+    initialize_config_defs();
     initialize_config_preload(config_file);
 
     title(u8"Elona Foobar version "s + latest_version.short_string());
@@ -154,8 +170,8 @@ void pre_init()
 
     Config::instance().is_test = true;
 
-    lua::lua->get_event_manager()
-        .run_callbacks<lua::EventKind::game_initialized>();
+    lua::lua->get_event_manager().trigger(
+        lua::BaseEvent("core.game_initialized"));
 }
 
 void post_run()
@@ -179,8 +195,8 @@ void reset_state()
 
     Config::instance().is_test = true;
 
-    lua::lua->get_event_manager()
-        .run_callbacks<lua::EventKind::game_initialized>();
+    lua::lua->get_event_manager().trigger(
+        lua::BaseEvent("core.game_initialized"));
 }
 
 } // namespace testing

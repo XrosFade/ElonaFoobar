@@ -1,18 +1,33 @@
-data:define_type("dialog")
-data:add_multi(
-   "core.dialog",
+local data = { _table = {} }
+function data:add_multi(tbl)
+   for _, v in ipairs(tbl) do
+      self:add(v)
+   end
+end
+function data:add(data)
+   self._table[data.id] = data
+end
+
+
+
+local unique = require("data/dialog/unique")
+
+data:add(
    {
-      {
-         name = "whom_dwell_in_the_vanity",
-
-         -- TODO legacy field that needs removal.
-         _full_id = "core.dialog#core.whom_dwell_in_the_vanity",
-
-         nodes = {
-            _start = {
-               text = "core.locale.talk.unique.whom_dwell_in_the_vanity",
-               choices = "End"
+      id = "ignored",
+      root = "core.locale.talk",
+      nodes = {
+         __start = {
+            text = {
+               {"ignores_you", args = function(t) return {t.speaker} end},
             }
-         }
+         },
       }
-})
+   }
+
+)
+data:add_multi(unique)
+
+
+
+return { ["core.dialog"] = data._table }

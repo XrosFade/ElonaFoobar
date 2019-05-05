@@ -129,20 +129,20 @@ fn extract_enums<'a>(tu: &'a TranslationUnit<'a>, path: &Path) -> Vec<Comment> {
     for t in get_range(&tu, path).tokenize() {
         match state {
             EnumParseState::TypeName => {
-                if t.get_kind() == TokenKind::Identifier {
+                if t.get_kind() == TokenKind::Literal {
                     name = strip_quotes(&t);
                     state = EnumParseState::Entries;
-                    // Skip the next 3 opening braces.
+                    // Skip the next 2 opening braces.
                     // EnumMap<Type> Map { "Map", {{ "Member", Type::Member }, ...}};
-                    //                   ^        ^^ ~~~~~~~~
-                    braces_left = 3;
+                    //                            ^^ ~~~~~~~~
+                    braces_left = 2;
                 }
             }
             EnumParseState::Comment => {
                 if t.get_kind() == TokenKind::Identifier && t.get_spelling() == ENUM_MAP {
-                    // Found "EnumMap", next identifier token should be type.
-                    // EnumMap<Type> Map { ... };
-                    // ^^^^^^^ ~~~~
+                    // Found "EnumMap", next literal token should be type.
+                    // EnumMap<Type> Map { "Type", ... };
+                    // ^^^^^^^             ~~~~~~
                     state = EnumParseState::TypeName;
                 }
             }
@@ -349,10 +349,12 @@ impl Document {
     pub fn render<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         writer.write(to_lua_comment(&self.module_comment.text).as_bytes())?;
         writer.write(self.module_comment.import_comment().as_bytes())?;
+        writer.write("\n".as_bytes())?;
 
         for comment in self.comments.iter() {
-            writer.write("\n\n".as_bytes())?;
+            writer.write("\n".as_bytes())?;
             comment.render(writer)?;
+            writer.write("\n".as_bytes())?;
         }
 
         Ok(())
@@ -547,9 +549,28 @@ fn uppercase(s: &str) -> String {
     }
 }
 
+fn camel_case(s: &str) -> String {
+    let mut buffer = String::new();
+    let mut under = false;
+    for c in s.chars() {
+        match c {
+            '_' => under = true,
+            _ => {
+                if under {
+                    buffer.push_str(&c.to_uppercase().to_string());
+                    under = false;
+                } else {
+                    buffer.push(c)
+                }
+            }
+        }
+    }
+    buffer
+}
+
 fn get_output_filename(source_path: &Path, is_class: bool) -> String {
     let file_name = source_path.file_name().and_then(|f| f.to_str()).unwrap();
-    let mod_name = Regex::new(r"_([^_]*)\..*$") // lua_api_<...>.cpp
+    let mod_name = Regex::new(r"lua_[^_]*_(.*)\..*$") // lua_(api|class)_<...>.cpp
         .ok()
         .and_then(|r| r.captures(file_name))
         .and_then(|c| c.get(1))
@@ -558,7 +579,7 @@ fn get_output_filename(source_path: &Path, is_class: bool) -> String {
     match mod_name {
         Some(name) => {
             if is_class {
-                format!("Lua{}.luadoc", uppercase(name))
+                format!("Lua{}.luadoc", uppercase(&camel_case(&name)))
             } else {
                 format!("{}.luadoc", name)
             }

@@ -3,6 +3,7 @@
 #include "config/config.hpp"
 #include "init.hpp"
 #include "lua_env/event_manager.hpp"
+#include "lua_env/lua_event/base_event.hpp"
 #include "main_menu.hpp"
 #include "profile/profile_manager.hpp"
 #include "turn_sequence.hpp"
@@ -26,8 +27,8 @@ tinyargparser::ArgParser _make_argparser()
 
 void _main_loop()
 {
-    lua::lua->get_event_manager()
-        .run_callbacks<lua::EventKind::game_initialized>();
+    lua::lua->get_event_manager().trigger(
+        lua::BaseEvent("core.game_initialized"));
 
     while (true)
     {
@@ -44,7 +45,7 @@ void _main_loop()
 void _start_elona()
 {
     if (Config::instance().startup_script != ""s &&
-        !Config::instance().get<bool>("core.config.foobar.run_script_in_save"))
+        !Config::instance().get<bool>("core.foobar.run_script_in_save"))
     {
         mode = 6;
         initialize_game();

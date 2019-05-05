@@ -3,6 +3,7 @@ local Math = Elona.require("Math")
 local Chara = Elona.require("Chara")
 local Skill = Elona.require("Skill")
 local Rand = Elona.require("Rand")
+local Registry = Elona.require("Registry")
 
 local shop_inventory = {}
 
@@ -113,7 +114,7 @@ local function is_cursed(item)
 end
 
 function shop_inventory.should_remove(item, inv)
-   local tags = data.raw["core.item"][item.new_id].tags
+   local tags = Registry.get_table("core.item")[item.id].tags
 
    if has_tag("neg", tags) then
       return true
@@ -155,7 +156,7 @@ shop_inventory.item_number_factors = {
 }
 
 function shop_inventory.calc_max_item_number(item)
-   local item_def = data.raw["core.item"][item.new_id]
+   local item_def = Registry.get_table("core.item")[item.id]
    local category = item_def.category
    local number = 1
 
@@ -164,7 +165,7 @@ function shop_inventory.calc_max_item_number(item)
       number = f({item_def = item_def, item = item})
    end
 
-   f = shop_inventory.item_number_factors[item.new_id]
+   f = shop_inventory.item_number_factors[item.id]
    if f then
       number = f({item_def = item_def, item = item})
    end
@@ -188,7 +189,7 @@ shop_inventory.cargo_amount_rates = {
 }
 
 function shop_inventory.cargo_amount_modifier(amount)
-   return amount * (100 + Skill.level(156, Chara.player()) * 10) / 100 + 1
+   return amount * (100 + Chara.player():get_skill("core.negotiation").current_level * 10) / 100 + 1
 end
 
 -- Calculate adjusted amount of cargo items to be sold based on the
@@ -284,7 +285,7 @@ function shop_inventory.do_generate(shopkeeper, inv)
          item.value = inv.item_base_value({item = item, shopkeeper = shopkeeper})
       end
 
-      Item.stack(-1, item) -- invalidates "item".
+      Item.stack(-1, item, false) -- invalidates "item".
 
       ::continue::
    end
@@ -294,10 +295,10 @@ function shop_inventory.generate(shopkeeper)
    -- Obtain shop inventory data by using the shopkeeper's
    -- character_role as its legacy ID index. If it does not exist, a
    -- default set of items will be generated as a fallback.
-   local id = data.by_legacy["core.shop_inventory"][shopkeeper.role]
+   local id = Registry.get_id_by_legacy("core.shop_inventory", shopkeeper.role)
    local inv = {}
    if id then
-      inv = data.raw["core.shop_inventory"][id]
+      inv = Registry.get_table("core.shop_inventory")[id]
    end
 
    shop_inventory.do_generate(shopkeeper, inv)

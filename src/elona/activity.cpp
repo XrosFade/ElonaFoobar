@@ -1380,7 +1380,7 @@ void continuous_action_others()
         game_data.previous_dungeon_level = game_data.current_dungeon_level;
         game_data.previous_x = cdata.player().position.x;
         game_data.previous_y = cdata.player().position.y;
-        game_data.destination_map = 30;
+        game_data.destination_map = static_cast<int>(mdata_t::MapId::shelter_);
         game_data.destination_dungeon_level = inv[ci].count;
         levelexitby = 2;
         snd("core.exitmap1");
@@ -1719,7 +1719,7 @@ void spot_mining_or_wall()
         {
             txt(i18n::s.get("core.locale.activity.dig_mining.start.spot"));
         }
-        if (chipm(0, cell_data.at(refx, refy).chip_id_actual) == 6)
+        if (chip_data.for_cell(refx, refy).kind == 6)
         {
             txt(i18n::s.get("core.locale.activity.dig_mining.start.hard"));
         }
@@ -1740,7 +1740,7 @@ void spot_mining_or_wall()
         }
         ++countdig;
         f = 0;
-        if (chipm(0, cell_data.at(refx, refy).chip_id_actual) == 6)
+        if (chip_data.for_cell(refx, refy).kind == 6)
         {
             if (rnd(12000) < sdata(10, cc) + sdata(163, cc) * 10)
             {

@@ -4,12 +4,13 @@
 #include "audio.hpp"
 #include "character.hpp"
 #include "config/config.hpp"
+#include "data/types/type_asset.hpp"
 #include "debug.hpp"
 #include "draw.hpp"
 #include "fov.hpp"
 #include "i18n.hpp"
 #include "item.hpp"
-#include "lua_env/lua_console.hpp"
+#include "lua_env/console.hpp"
 #include "map.hpp"
 #include "random.hpp"
 #include "variables.hpp"
@@ -38,7 +39,6 @@ int cs_posbk_w;
 int cs_posbk_h;
 
 constexpr int inf_clockw = 120;
-constexpr int inf_clockh = 96;
 
 
 
@@ -536,7 +536,7 @@ void render_buffs()
             break;
 
         // Icon
-        gcopy(5, buff.id * 32, 1120, 32, 32, x, y);
+        draw_indexed("buff_icon", x, y, buff.id);
         // Turns
         mes(x + 3, y + 19, std::to_string(buff.turns));
         // Turns
@@ -1806,11 +1806,9 @@ void ui_scroll_screen()
     {
         scrollp = 6;
         keybd_wait = 1000;
-        if (chipm(
-                0,
-                cell_data
-                    .at(cdata.player().position.x, cdata.player().position.y)
-                    .chip_id_actual) == 4)
+        if (chip_data
+                .for_cell(cdata.player().position.x, cdata.player().position.y)
+                .kind == 4)
         {
             scrollp = 9;
         }
@@ -1868,6 +1866,11 @@ void ui_scroll_screen()
 
 void ui_initialize_minimap()
 {
+    raderx = -1;
+    radery = -1;
+    raderw = 120 / map_data.width + 2;
+    raderh = 84 / map_data.height + 2;
+
     gsel(3);
     for (int cnt = 0, cnt_end = (map_data.height); cnt < cnt_end; ++cnt)
     {
@@ -1877,15 +1880,16 @@ void ui_initialize_minimap()
             sx = cnt;
             sy(1) = 84 * sy / map_data.height;
             sx(1) = 120 * sx / map_data.width;
+            const auto rect = draw_get_rect(chip_data.for_cell(sx, sy).key);
             gcopy(
-                2,
-                cell_data.at(sx, sy).chip_id_actual % 33 * inf_tiles + sx % 16,
-                cell_data.at(sx, sy).chip_id_actual / 33 * inf_tiles + sy % 12,
+                rect->buffer,
+                rect->x + sx % 16,
+                rect->y + sy % 12,
                 raderw,
                 raderh,
                 688 + sx(1),
                 528 + sy(1));
-            if (chipm(7, cell_data.at(sx, sy).chip_id_actual) & 4)
+            if (chip_data.for_cell(sx, sy).effect & 4)
             {
                 boxf(688 + sx(1), 528 + sy(1), raderw, raderh, {0, 0, 0, 100});
             }
@@ -2312,12 +2316,11 @@ void load_background_variants(int buffer)
 
 void clear_background_in_character_making()
 {
-    gsel(4);
-    picload(filesystem::dir::graphic() / u8"void.bmp", 0, 0, false);
-    gcopy(4, 0, 0, 800, 600, 0, 0, windoww, windowh);
+    asset_load("void");
+    draw("void", 0, 0, windoww, windowh);
     gsel(0);
     gmode(0);
-    gcopy(4, 0, 0, windoww, 64, 0, 0);
+    draw_region("void", 0, 0, 0, 0, windoww, 64);
     gmode(2);
 }
 
@@ -2325,12 +2328,11 @@ void clear_background_in_character_making()
 
 void clear_background_in_continue()
 {
-    gsel(4);
-    picload(filesystem::dir::graphic() / u8"void.bmp", 0, 0, false);
-    gcopy(4, 0, 0, 800, 600, 0, 0, windoww, windowh);
+    asset_load("void");
+    draw("void", 0, 0, windoww, windowh);
     gsel(0);
     gmode(0);
-    gcopy(4, 0, 0, windoww, windowh, 0, 0);
+    draw("void", 0, 0, windoww, windowh);
     gmode(2);
 }
 
@@ -2347,19 +2349,21 @@ void draw_scroll(int x, int y, int width, int height)
         {
             if (i == 0)
             {
-                gcopy(7, 0, 0, 64, 48, x, y);
-                gcopy(7, 0, 144, 64, 48, x, y3);
+                draw_region("ie_scroll", x, y, 0, 0, 64, 48);
+                draw_region("ie_scroll", x, y3, 0, 144, 64, 48);
             }
             continue;
         }
         if (i < width / 8 - 8)
         {
-            gcopy(7, (i - 8) % 18 * 8 + 64, 0, 8, 48, i * 8 + x, y);
-            gcopy(7, (i - 8) % 18 * 8 + 64, 144, 8, 48, i * 8 + x, y3);
+            draw_region(
+                "ie_scroll", i * 8 + x, y, (i - 8) % 18 * 8 + 64, 0, 8, 48);
+            draw_region(
+                "ie_scroll", i * 8 + x, y3, (i - 8) % 18 * 8 + 64, 144, 8, 48);
             continue;
         }
-        gcopy(7, 208, 0, 64, 48, x3, y);
-        gcopy(7, 208, 144, 64, 48, x3, y3);
+        draw_region("ie_scroll", x3, y, 208, 0, 64, 48);
+        draw_region("ie_scroll", x3, y3, 208, 144, 64, 48);
         break;
     }
 
@@ -2369,22 +2373,24 @@ void draw_scroll(int x, int y, int width, int height)
         {
             if (j == 0)
             {
-                gcopy(7, 0, i % 12 * 8 + 48, 64, 8, x, i * 8 + y + 48);
+                draw_region(
+                    "ie_scroll", x, i * 8 + y + 48, 0, i % 12 * 8 + 48, 64, 8);
                 continue;
             }
             if (j < width / 8 - 15)
             {
-                gcopy(
-                    7,
+                draw_region(
+                    "ie_scroll",
+                    j * 8 + x + 56,
+                    i * 8 + y + 48,
                     j % 18 * 8 + 64,
                     i % 12 * 8 + 48,
                     8,
-                    8,
-                    j * 8 + x + 56,
-                    i * 8 + y + 48);
+                    8);
                 continue;
             }
-            gcopy(7, 208, i % 12 * 8 + 48, 64, 8, x3, i * 8 + y + 48);
+            draw_region(
+                "ie_scroll", x3, i * 8 + y + 48, 208, i % 12 * 8 + 48, 64, 8);
             break;
         }
     }
@@ -2416,7 +2422,7 @@ void cs_list(
 
         gsel(3);
         gcopy(0, x, y, width, 19, 264, 96);
-        draw_copy_from(0, x, y, width, 19, "list_scratch");
+        asset_copy_from(0, x, y, width, 19, "list_scratch");
         gsel(0);
 
         boxf(x, y, width, 19, {127, 191, 255, 63});
@@ -2627,10 +2633,10 @@ void window2(
     case 5: break;
     case 6:
         gmode(2, 180);
-        draw_region(
+        draw_region_centered(
             "window",
             x + width / 2,
-            y + width / 2,
+            y + height / 2,
             24,
             24,
             228,

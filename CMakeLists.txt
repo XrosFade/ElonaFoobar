@@ -175,7 +175,6 @@ else()
       src/tests/util.cpp
       src/tests/config.cpp
       src/tests/config_def.cpp
-      src/tests/dialog.cpp
       src/tests/filesystem.cpp
       src/tests/spec.cpp
       src/tests/lua_api.cpp
@@ -197,6 +196,7 @@ else()
       src/tests/keybind_key_names.cpp
       src/tests/keybind_manager.cpp
       src/tests/keybind_serializer.cpp
+      src/tests/semver.cpp
       src/tests/serialization.cpp
       )
 
@@ -312,6 +312,10 @@ else()
   set(DISABLED_WARNINGS)
   set(WARNINGS_AS_ERRORS)
 
+  list(APPEND EXTRA_DEFINES
+    "BOOST_ALLOW_DEPRECATED_HEADERS" # https://github.com/boostorg/random/issues/49
+    )
+
   if(MSVC)
     list(APPEND EXTRA_DEFINES "_UNICODE")
     list(APPEND GENERAL_OPTIONS
@@ -325,6 +329,7 @@ else()
       "MTd"
       "ZI"
       "Od"
+      "bigobj"
       )
     list(APPEND RELEASE_OPTIONS
       "MT"
@@ -505,6 +510,12 @@ function(copy_file source target)
     ${target})
 endfunction()
 
+function(remove_dir dir)
+  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E remove_directory
+    ${dir})
+endfunction()
+
 if(ANDROID)
   set(ASSET_DIR "${CMAKE_SOURCE_DIR}/android/app/src/main/assets")
   file(REMOVE_RECURSE ${ASSET_DIR})
@@ -525,7 +536,6 @@ copy_dir(${CMAKE_SOURCE_DIR}/runtime/graphic/ "${RUNTIME_DIR}/graphic/")
 copy_dir(${CMAKE_SOURCE_DIR}/runtime/locale/ "${RUNTIME_DIR}/locale/")
 copy_dir(${CMAKE_SOURCE_DIR}/runtime/map/ "${RUNTIME_DIR}/map/")
 copy_dir(${CMAKE_SOURCE_DIR}/runtime/profile/ "${RUNTIME_DIR}/profile/")
-copy_file(${CMAKE_SOURCE_DIR}/runtime/assets.hcl "${RUNTIME_DIR}")
 
 # Copy assets from Elona 1.22 if they are present.
 if (NOT ANDROID OR ANDROID_BUNDLE_ASSETS)
@@ -547,4 +557,7 @@ if(NOT ANDROID)
   if(ELONA_BUILD_TARGET STREQUAL "TESTS")
     copy_dir(${CMAKE_SOURCE_DIR}/src/tests/lua "$<TARGET_FILE_DIR:${PROJECT_NAME}>/tests/lua")
   endif()
+
+  remove_dir("$<TARGET_FILE_DIR:${PROJECT_NAME}>/profile/testing")
+  remove_dir("$<TARGET_FILE_DIR:${PROJECT_NAME}>/profile/default")
 endif()

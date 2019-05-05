@@ -40,8 +40,10 @@
 #include "item.hpp"
 #include "itemgen.hpp"
 #include "log.hpp"
+#include "lua_env/event_manager.hpp"
 #include "lua_env/interface.hpp"
 #include "lua_env/lua_env.hpp"
+#include "lua_env/lua_event/character_instance_event.hpp"
 #include "lua_env/mod_manager.hpp"
 #include "macro.hpp"
 #include "magic.hpp"
@@ -88,29 +90,35 @@ void select_house_board_tile()
 {
     snd("core.pop2");
 
+    auto box_size = inf_tiles / 2;
     while (1)
     {
         gmode(0);
         p = 0;
+        // TODO
         for (int y = 0; y < 20; ++y)
         {
             for (int x = 0; x < 33; ++x)
             {
                 if (p < listmax)
                 {
-                    gcopy(
-                        2,
-                        list(0, p) % 33 * 48,
-                        list(0, p) / 33 * 48,
-                        48,
-                        48,
-                        x * 24,
-                        y * 24,
-                        24,
-                        24);
-                    if (chipm(7, list(0, p)) & 4)
+                    const auto& chip = chip_data[list(0, p)];
+                    draw_map_tile(
+                        list(0, p),
+                        x * box_size,
+                        y * box_size,
+                        inf_tiles,
+                        inf_tiles,
+                        box_size,
+                        box_size);
+                    if (chip.effect & 4)
                     {
-                        boxl(x * 24, y * 24, 24, 24, {240, 230, 220});
+                        boxl(
+                            x * box_size,
+                            y * box_size,
+                            box_size,
+                            box_size,
+                            {240, 230, 220});
                     }
                 }
                 ++p;
@@ -123,7 +131,7 @@ void select_house_board_tile()
         const auto input = stick();
         if (input == StickKey::mouse_left)
         {
-            p = mousex / 24 + mousey / 24 * 33;
+            p = mousex / box_size + mousey / box_size * 33;
             if (p >= listmax)
             {
                 snd("core.fail1");
@@ -1014,14 +1022,14 @@ int route_info(int& x, int& y, int n)
         {
             return 0;
         }
-        if (chipm(7, cell_data.at(x, y).chip_id_actual) & 1)
+        if (chip_data.for_cell(x, y).effect & 1)
         {
             return 0;
         }
         if (cell_data.at(x, y).feats != 0)
         {
             cell_featread(x, y);
-            if (chipm(7, feat) & 1)
+            if (chip_data[feat].effect & 1)
             {
                 return 0;
             }
@@ -1087,7 +1095,7 @@ int breath_list()
                 {
                     continue;
                 }
-                if (chipm(7, cell_data.at(tx, ty).chip_id_actual) & 1)
+                if (chip_data.for_cell(tx, ty).effect & 1)
                 {
                     continue;
                 }
@@ -1741,7 +1749,7 @@ void spillblood(int x, int y, int range)
         {
             continue;
         }
-        if (chipm(2, cell_data.at(dx_at_m136, dy_at_m136).chip_id_actual))
+        if (chip_data.for_cell(dx_at_m136, dy_at_m136).wall_kind)
         {
             continue;
         }
@@ -1773,7 +1781,7 @@ void spillfrag(int x, int y, int range)
         {
             continue;
         }
-        if (chipm(2, cell_data.at(dx_at_m136, dy_at_m136).chip_id_actual))
+        if (chip_data.for_cell(dx_at_m136, dy_at_m136).wall_kind)
         {
             continue;
         }
@@ -2640,11 +2648,11 @@ int convertartifact(int item_index, int ignore_external_container)
         return item_index;
     }
     f_at_m163 = 0;
-    for (int cnt = 0; cnt < 5480; ++cnt)
+    for (int cnt = 0; cnt < ELONA_MAX_ITEMS; ++cnt)
     {
         if (ignore_external_container)
         {
-            if (cnt >= 5080)
+            if (cnt >= ELONA_ITEM_ON_GROUND_INDEX)
             {
                 break;
             }
@@ -4089,7 +4097,7 @@ TurnResult exit_map()
         }
     }
     game_data.previous_map = game_data.current_map;
-    if (game_data.previous_map == 30)
+    if (game_data.previous_map == mdata_t::MapId::shelter_)
     {
         game_data.current_map = game_data.previous_map2;
         game_data.current_dungeon_level = game_data.previous_dungeon_level;
@@ -4264,7 +4272,8 @@ TurnResult exit_map()
         game_data.current_dungeon_level = game_data.destination_dungeon_level;
         if (game_data.executing_immediate_quest_type == 0)
         {
-            if (game_data.previous_map != 2)
+            if (game_data.previous_map !=
+                static_cast<int>(mdata_t::MapId::fields))
             {
                 game_data.pc_x_in_world_map =
                     area_data[game_data.current_map].position.x;
@@ -4286,7 +4295,8 @@ TurnResult exit_map()
         rc = 0;
         revive_player();
         game_data.current_map = static_cast<int>(mdata_t::MapId::your_home);
-        game_data.destination_outer_map = area_data[7].outer_map;
+        game_data.destination_outer_map =
+            area_data[static_cast<int>(mdata_t::MapId::your_home)].outer_map;
         game_data.current_dungeon_level = 1;
     }
     if (rdtry > 1)
@@ -4451,15 +4461,18 @@ TurnResult exit_map()
     bool map_changed = game_data.current_map != previous_map ||
         game_data.current_dungeon_level != previous_dungeon_level;
 
-    // Only clear map-local data if the map was changed. The map might
+    ELONA_LOG("map") << "exit_map levelexitby " << levelexitby << " cur "
+                     << game_data.current_map << " cur_level "
+                     << game_data.current_dungeon_level << " prev "
+                     << previous_map << " prev_level "
+                     << previous_dungeon_level;
+
+    // Only trigger the map unload event if the map was changed. The map might
     // not change if access to it is refused (jail, pyramid, etc.).
     if (map_changed)
     {
-        lua::lua->get_event_manager()
-            .run_callbacks<lua::EventKind::map_unloading>();
-
-        lua::lua->get_mod_manager().clear_map_local_data();
-        lua::lua->get_handle_manager().clear_map_local_handles();
+        lua::lua->get_event_manager().trigger(
+            lua::BaseEvent("core.before_map_unload"));
     }
 
     mode = 2;
@@ -4507,90 +4520,6 @@ void save_map_local_data()
 
     // write data for items/character inventories local to this map
     ctrl_file(FileOperation2::map_items_write, u8"inv_"s + mid + u8".s2");
-}
-
-
-
-void map_prepare_tileset_atlas()
-{
-    gsel(6);
-    if (map_data.atlas_number != mtilefilecur)
-    {
-        picload(
-            filesystem::dir::graphic() /
-                (u8"map"s + map_data.atlas_number + u8".bmp"),
-            0,
-            0,
-            false);
-        mtilefilecur = map_data.atlas_number;
-        initialize_map_chip();
-    }
-    map_tileset(map_data.tileset);
-    gsel(2);
-
-    int shadow = 5;
-    if (map_data.indoors_flag == 2)
-    {
-        if (game_data.date.hour >= 24 ||
-            (game_data.date.hour >= 0 && game_data.date.hour < 4))
-        {
-            shadow = 110;
-        }
-        if (game_data.date.hour >= 4 && game_data.date.hour < 10)
-        {
-            shadow = std::min(10, 70 - (game_data.date.hour - 3) * 10);
-        }
-        if (game_data.date.hour >= 10 && game_data.date.hour < 12)
-        {
-            shadow = 10;
-        }
-        if (game_data.date.hour >= 12 && game_data.date.hour < 17)
-        {
-            shadow = 1;
-        }
-        if (game_data.date.hour >= 17 && game_data.date.hour < 21)
-        {
-            shadow = (game_data.date.hour - 17) * 20;
-        }
-        if (game_data.date.hour >= 21 && game_data.date.hour < 24)
-        {
-            shadow = 80 + (game_data.date.hour - 21) * 10;
-        }
-        if (game_data.weather == 3 && shadow < 40)
-        {
-            shadow = 40;
-        }
-        if (game_data.weather == 4 && shadow < 65)
-        {
-            shadow = 65;
-        }
-        if (game_data.current_map == mdata_t::MapId::noyel &&
-            (game_data.date.hour >= 17 || game_data.date.hour < 7))
-        {
-            shadow += 35;
-        }
-    }
-
-    gmode(0);
-    set_color_mod(255 - shadow, 255 - shadow, 255 - shadow, 6);
-    gcopy(6, 0, 0, 33 * inf_tiles, 25 * inf_tiles, 0, 0);
-    set_color_mod(255, 255, 255, 6);
-    gmode(2, 30);
-    if (map_data.atlas_number == 0)
-    {
-        gcopy(6, 0, 192, 1360, 48, 0, 192);
-    }
-    if (map_data.atlas_number == 1)
-    {
-        gcopy(6, 0, 1056, 1360, 48, 0, 1056);
-    }
-    if (map_data.atlas_number != 2)
-    {
-        gcopy(6, 0, 336, 1360, 48, 0, 336);
-    }
-    gmode(0);
-    gsel(0);
-    gmode(2);
 }
 
 
@@ -4685,7 +4614,7 @@ void map_global_prepare()
 
 void map_global_place_entrances()
 {
-    initialize_map_chip();
+    draw_prepare_map_chips();
     for (int cnt = 0; cnt < 20; ++cnt)
     {
         int cnt2 = cnt;
@@ -4737,11 +4666,10 @@ void map_global_place_entrances()
             area_data[cnt].position.y = map_data.height / 2;
         }
         p = cnt;
-        if (chipm(
-                7,
-                cell_data
-                    .at(area_data[cnt].position.x, area_data[cnt].position.y)
-                    .chip_id_actual) &
+        if (chip_data
+                    .for_cell(
+                        area_data[cnt].position.x, area_data[cnt].position.y)
+                    .effect &
                 4 ||
             cell_data.at(area_data[cnt].position.x, area_data[cnt].position.y)
                     .feats != 0)
@@ -4762,7 +4690,7 @@ void map_global_place_entrances()
                 {
                     continue;
                 }
-                if (chipm(7, cell_data.at(x, y).chip_id_actual) & 4)
+                if (chip_data.for_cell(x, y).effect & 4)
                 {
                     continue;
                 }
@@ -4898,15 +4826,10 @@ void atxinit()
         update_screen();
         mode = 9;
         atxbgbk = atxbg;
-        gsel(4);
         gmode(0);
-        picload(filesystem::dir::graphic() / (atxbg + u8".bmp"s), 0, 0, false);
-        gcopy(
-            4,
-            0,
-            0,
-            240,
-            160,
+        asset_load(atxbg);
+        draw(
+            "atx_background",
             0,
             inf_msgh,
             windoww,
@@ -5209,9 +5132,10 @@ std::string txtitemoncell(int x, int y)
             rtvaln = "";
             p_at_m185(0) = -cell_data.at(x, y).item_appearances_memory;
             p_at_m185(1) = 0;
-            i_at_m185(0) = p_at_m185 % 1000 + 5080;
-            i_at_m185(1) = p_at_m185 / 1000 % 1000 + 5080;
-            i_at_m185(2) = p_at_m185 / 1000000 % 1000 + 5080;
+            i_at_m185(0) = p_at_m185 % 1000 + ELONA_ITEM_ON_GROUND_INDEX;
+            i_at_m185(1) = p_at_m185 / 1000 % 1000 + ELONA_ITEM_ON_GROUND_INDEX;
+            i_at_m185(2) =
+                p_at_m185 / 1000000 % 1000 + ELONA_ITEM_ON_GROUND_INDEX;
             for (int cnt = 0; cnt < 3; ++cnt)
             {
                 if (i_at_m185(cnt) == 6079)
@@ -5411,9 +5335,9 @@ TurnResult step_into_gate()
 
 
 
-int target_position()
+int target_position(bool target_chara)
 {
-    if (tlocinitx != 0 || tlocinity != 0)
+    if (tlocinitx != 0 || tlocinity != 0 || homemapmode == 1)
     {
         tlocx = tlocinitx;
         tlocy = tlocinity;
@@ -5431,26 +5355,30 @@ int target_position()
     else
     {
         scposval = 1;
-        if (cdata.player().enemy_id == 0)
+
+        if (target_chara)
         {
-            find_enemy_target();
-        }
-        build_target_list();
-        if (listmax == 0)
-        {
-            txt(i18n::s.get("core.locale.misc.no_target_around"));
-        }
-        for (int cnt = 0, cnt_end = (listmax); cnt < cnt_end; ++cnt)
-        {
-            if (list(0, cnt) == 0)
+            if (cdata.player().enemy_id == 0)
             {
-                continue;
+                find_enemy_target();
             }
-            if (list(0, cnt) == cdata.player().enemy_id)
+            build_target_list();
+            if (listmax == 0)
             {
-                tlocx = cdata[list(0, cnt)].position.x;
-                tlocy = cdata[list(0, cnt)].position.y;
-                break;
+                txt(i18n::s.get("core.locale.misc.no_target_around"));
+            }
+            for (int cnt = 0, cnt_end = (listmax); cnt < cnt_end; ++cnt)
+            {
+                if (list(0, cnt) == 0)
+                {
+                    continue;
+                }
+                if (list(0, cnt) == cdata.player().enemy_id)
+                {
+                    tlocx = cdata[list(0, cnt)].position.x;
+                    tlocy = cdata[list(0, cnt)].position.y;
+                    break;
+                }
             }
         }
     }
@@ -5478,14 +5406,7 @@ int target_position()
         }
         if (homemapmode == 1)
         {
-            gcopy(
-                2,
-                tile % 33 * inf_tiles,
-                tile / 33 * inf_tiles,
-                inf_tiles,
-                inf_tiles,
-                windoww - 80,
-                20);
+            draw_map_tile(tile, windoww - 80, 20);
         }
         else
         {
@@ -5582,8 +5503,8 @@ int target_position()
             }
             if (input == StickKey::mouse_right)
             {
-                if (chipm(0, cell_data.at(tlocx, tlocy).chip_id_actual) == 2 ||
-                    chipm(0, cell_data.at(tlocx, tlocy).chip_id_actual) == 1)
+                if (chip_data.for_cell(tlocx, tlocy).kind == 2 ||
+                    chip_data.for_cell(tlocx, tlocy).kind == 1)
                 {
                     snd("core.fail1");
                     wait_key_released();
@@ -5593,8 +5514,9 @@ int target_position()
                 snd("core.cursor1");
                 wait_key_released();
             }
-            tx = clamp(mousex - inf_screenx, 0, windoww) / 48;
-            ty = clamp(mousey - inf_screeny, 0, (windowh - inf_verh)) / 48;
+            tx = clamp(mousex - inf_screenx, 0, windoww) / inf_tiles;
+            ty = clamp(mousey - inf_screeny, 0, (windowh - inf_verh)) /
+                inf_tiles;
             int stat = key_direction(action);
             if (stat == 1)
             {
@@ -5692,8 +5614,7 @@ int target_position()
         {
             if (findlocmode == 1)
             {
-                if (cansee == 0 ||
-                    chipm(7, cell_data.at(tlocx, tlocy).chip_id_actual) & 4)
+                if (cansee == 0 || chip_data.for_cell(tlocx, tlocy).effect & 4)
                 {
                     txt(i18n::s.get(
                         "core.locale.action.which_direction.cannot_see"));
@@ -5719,7 +5640,7 @@ int target_position()
                 snd("core.cursor1");
             }
             scposval = 0;
-            if (tlocinitx == 0 && tlocinity == 0)
+            if (tlocinitx == 0 && tlocinity == 0 && homemapmode != 1)
             {
                 update_screen();
             }
@@ -6726,13 +6647,8 @@ std::string getnpctxt(const std::string& tag, const std::string& default_text)
 TurnResult do_enter_strange_gate()
 {
     snd("core.exitmap1");
-    game_data.previous_map2 = game_data.current_map;
-    game_data.previous_dungeon_level = game_data.current_dungeon_level;
-    game_data.previous_x = cdata.player().position.x;
-    game_data.previous_y = cdata.player().position.y;
-    game_data.destination_map = 35;
-    game_data.destination_dungeon_level = 1;
-    levelexitby = 2;
+    map_prepare_for_travel_with_prev(
+        static_cast<int>(mdata_t::MapId::show_house));
     return TurnResult::exit_map;
 }
 
@@ -6905,7 +6821,7 @@ void disarm_trap()
 
 
 
-void proc_trap()
+void move_character()
 {
 label_21451_internal:
     if (Config::instance().scroll)
@@ -7165,10 +7081,9 @@ void draw_sleep_background_frame()
 
 void load_sleep_background()
 {
-    gsel(4);
     gmode(0);
-    picload(filesystem::dir::graphic() / u8"bg_night.bmp", 0, 0, false);
-    gcopy(4, 0, 0, 640, 480, 0, 0, windoww, windowh - inf_verh);
+    asset_load("bg_night");
+    draw("bg_night", 0, 0, windoww, windowh - inf_verh);
     gsel(0);
 }
 
@@ -7417,10 +7332,8 @@ void map_global_proc_travel_events()
                 cdata[cc].continuous_action.turn * 16 / 10;
         }
         if (game_data.weather == 2 ||
-            chipm(
-                0,
-                cell_data.at(cdata[cc].position.x, cdata[cc].position.y)
-                    .chip_id_actual) == 4)
+            chip_data.for_cell(cdata[cc].position.x, cdata[cc].position.y)
+                    .kind == 4)
         {
             cdata[cc].continuous_action.turn =
                 cdata[cc].continuous_action.turn * 22 / 10;
@@ -7461,10 +7374,8 @@ void map_global_proc_travel_events()
         }
     }
     if (game_data.weather == 2 ||
-        chipm(
-            0,
-            cell_data.at(cdata[cc].position.x, cdata[cc].position.y)
-                .chip_id_actual) == 4)
+        chip_data.for_cell(cdata[cc].position.x, cdata[cc].position.y).kind ==
+            4)
     {
         if (game_data.protects_from_bad_weather == 0)
         {
@@ -8396,7 +8307,7 @@ label_2173_internal:
     efsource = 0;
     if (inv[ci].number() == 0)
     {
-        if (ci >= 5080)
+        if (ci >= ELONA_ITEM_ON_GROUND_INDEX)
         {
             cell_refresh(inv[ci].position.x, inv[ci].position.y);
             return 1;
@@ -9207,7 +9118,7 @@ TurnResult do_bash()
             }
             if (y + 1 < map_data.height)
             {
-                if ((chipm(7, cell_data.at(x, y + 1).chip_id_actual) & 4) == 0)
+                if ((chip_data.for_cell(x, y + 1).effect & 4) == 0)
                 {
                     ++y;
                 }
@@ -9381,9 +9292,11 @@ TurnResult do_bash()
 
 TurnResult proc_movement_event()
 {
-    if (auto handle = lua::handle_opt(cdata[cc]))
+    auto result = lua::lua->get_event_manager().trigger(
+        lua::CharacterInstanceEvent("core.character_moved", cdata[cc]));
+    if (result.blocked())
     {
-        lua::run_event<lua::EventKind::character_moved>(*handle);
+        return TurnResult::turn_end;
     }
 
     if (cdata[cc].is_ridden())
@@ -9459,11 +9372,11 @@ TurnResult proc_movement_event()
             }
         }
     }
-    proc_trap();
+    move_character();
     p = cell_data.at(cdata[cc].position.x, cdata[cc].position.y).chip_id_actual;
-    if (chipm(0, p) == 3)
+    if (chip_data[p].kind == 3)
     {
-        if (chipm(1, p) == 5)
+        if (chip_data[p].kind2 == 5)
         {
             heal_insanity(cdata[cc], 1);
         }
@@ -9810,7 +9723,7 @@ void sense_map_feats_on_move()
                 txt(i18n::s.get("core.locale.action.move.sense_something"));
             }
         }
-        p = chipm(0, cell_data.at(x, y).chip_id_actual);
+        p = chip_data.for_cell(x, y).kind;
         if (p != 0)
         {
             if (tname(p) != ""s)
@@ -11506,10 +11419,8 @@ TurnResult do_plant()
         return TurnResult::pc_turn_user_error;
     }
     int val0;
-    if (chipm(
-            0,
-            cell_data.at(cdata.player().position.x, cdata.player().position.y)
-                .chip_id_actual) == 2)
+    if (chip_data.for_cell(cdata.player().position.x, cdata.player().position.y)
+            .kind == 2)
     {
         val0 = 1;
     }
@@ -11998,11 +11909,9 @@ label_2684_internal:
             notedel(p - cnt - 1);
         }
     }
-    gsel(4);
     gmode(0);
-    picload(
-        filesystem::dir::graphic() / (u8""s + file + u8".bmp"), 0, 0, false);
-    gcopy(4, 0, 0, 640, 480, 0, y1, windoww, y2 - y1);
+    asset_load(file);
+    draw(file, 0, y1, windoww, y2 - y1);
     gmode(2);
     boxf(0, 0, windoww, y1, {5, 5, 5});
     boxf(0, y2, windoww, windowh - y2, {5, 5, 5});
@@ -12239,7 +12148,7 @@ void weather_changes()
             sound_play_environmental();
         }
     }
-    map_prepare_tileset_atlas();
+    draw_prepare_map_chips();
     adventurer_update();
     foods_get_rotten();
     if (map_data.type == mdata_t::MapType::world_map)
@@ -12524,14 +12433,12 @@ void conquer_lesimas()
     mode = 0;
     play_music("core.mcMarch2");
     ui_win_screen_fade();
-    gsel(4);
-    picload(filesystem::dir::graphic() / u8"void.bmp", 0, 0, false);
-    gcopy(4, 0, 0, 640, 480, 0, 0, windoww, windowh);
+    asset_load("void");
+    draw_region("void", 0, 0, 0, 0, 640, 480, windoww, windowh);
     gsel(0);
     animation_fade_in();
-    gcopy(4, 0, 0, windoww, windowh, 0, 0);
-    gsel(4);
-    picload(filesystem::dir::graphic() / u8"g1.bmp", 0, 0, false);
+    draw_region("void", 0, 0, 0, 0, windoww, windowh);
+    asset_load("g1");
     gsel(0);
     ui_draw_caption(i18n::s.get(
         "core.locale.win.you_acquired_codex", cdatan(1, 0), cdatan(0, 0)));
@@ -12546,20 +12453,8 @@ void conquer_lesimas()
         windowh / 2 - wh / 2,
         ww,
         wh);
-    cmbg = 0;
-    x = ww / 3 - 20;
-    y = wh - 140;
     gmode(2, 250);
-    gcopy_c(
-        4,
-        cmbg / 4 % 4 * 180,
-        cmbg / 4 / 4 % 2 * 300,
-        180,
-        300,
-        wx + ww - 120,
-        wy + wh / 2,
-        x,
-        y);
+    draw_centered("g1", wx + ww - 120, wy + wh / 2, ww / 3 - 20, wh - 140);
     gmode(2);
     display_topic(
         i18n::s.get("core.locale.win.window.caption"), wx + 28, wy + 40);
@@ -12724,8 +12619,7 @@ TurnResult pc_died()
         std::ofstream out{bone_filepath.native(), std::ios::binary};
         out << buff(0) << std::endl;
     }
-    gsel(4);
-    picload(filesystem::dir::graphic() / u8"void.bmp", 0, 0, false);
+    asset_load("void");
     gsel(0);
     show_game_score_ranking();
     ui_draw_caption(
@@ -12765,7 +12659,7 @@ void show_game_score_ranking()
 {
     notesel(buff);
     gmode(0);
-    gcopy(4, 0, 0, 800, 600, 0, 0, windoww, windowh);
+    draw("void", 0, 0, windoww, windowh);
     gmode(2);
     x = 135;
     y = 134;

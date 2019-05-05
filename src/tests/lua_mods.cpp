@@ -8,6 +8,8 @@
 #include "../elona/itemgen.hpp"
 #include "../elona/lua_env/event_manager.hpp"
 #include "../elona/lua_env/lua_env.hpp"
+#include "../elona/lua_env/lua_event/base_event.hpp"
+#include "../elona/lua_env/lua_event/lua_event_map_initialized.hpp"
 #include "../elona/lua_env/mod_manager.hpp"
 #include "../elona/testing.hpp"
 #include "../elona/variables.hpp"
@@ -135,21 +137,21 @@ end
 
 Store.global.thing = 1
 
-Event.register(Event.EventKind.AllTurnsFinished, my_turn_handler)
+Event.register("core.all_turns_finished", my_turn_handler)
 )"));
 
     REQUIRE_NOTHROW(
         mod_mgr.run_in_mod("test", "assert(Store.global.thing == 1)"));
 
-    lua.get_event_manager()
-        .run_callbacks<elona::lua::EventKind::all_turns_finished>();
+    lua.get_event_manager().trigger(
+        elona::lua::BaseEvent("core.all_turns_finished"));
     REQUIRE_NOTHROW(
         mod_mgr.run_in_mod("test", "assert(Store.global.thing == 2)"));
 
-    lua.get_event_manager()
-        .run_callbacks<elona::lua::EventKind::all_turns_finished>();
-    lua.get_event_manager()
-        .run_callbacks<elona::lua::EventKind::all_turns_finished>();
+    lua.get_event_manager().trigger(
+        elona::lua::BaseEvent("core.all_turns_finished"));
+    lua.get_event_manager().trigger(
+        elona::lua::BaseEvent("core.all_turns_finished"));
     REQUIRE_NOTHROW(
         mod_mgr.run_in_mod("test", "assert(Store.global.thing == 4)"));
 }
@@ -209,14 +211,14 @@ end
 
 Store.global.grid = grid
 
-Event.register(Event.EventKind.AllTurnsFinished, my_turn_handler)
+Event.register("core.all_turns_finished", my_turn_handler)
 )"));
 
     REQUIRE_NOTHROW(
         mod_mgr.run_in_mod("test", "assert(Store.global.grid[1][1] == 0)"));
 
-    lua.get_event_manager()
-        .run_callbacks<elona::lua::EventKind::all_turns_finished>();
+    lua.get_event_manager().trigger(
+        elona::lua::BaseEvent("core.all_turns_finished"));
     REQUIRE_NOTHROW(
         mod_mgr.run_in_mod("test", "assert(Store.global.grid[1][1] == 1)"));
 }
@@ -263,11 +265,27 @@ assert(a == nil)
 static void _create_mod(
     elona::lua::LuaEnv& lua,
     const std::string& name,
-    const std::unordered_set<std::string> deps)
+    const std::unordered_map<std::string, std::string> deps)
 {
+    elona::lua::ModManifest::Dependencies deps_(deps.size());
+    for (const auto& kvp : deps)
+    {
+        const auto& key = kvp.first;
+        const auto& value = kvp.second;
+        const auto ver = semver::VersionRequirement::parse(value);
+        if (ver)
+        {
+            deps_.emplace(key, ver.right());
+        }
+        else
+        {
+            throw std::runtime_error{ver.left()};
+        }
+    }
+
     elona::lua::ModManifest manifest;
     manifest.name = name;
-    manifest.dependencies = deps;
+    manifest.dependencies = deps_;
     lua.get_mod_manager().create_mod(manifest, false);
 };
 
@@ -276,9 +294,9 @@ TEST_CASE("Test calculation of loading order of mods", "[Lua: Mods]")
 {
     elona::lua::LuaEnv lua;
 
-    _create_mod(lua, "a", {"c"});
+    _create_mod(lua, "a", {{"c", "*"}});
     _create_mod(lua, "b", {});
-    _create_mod(lua, "c", {"b", "d"});
+    _create_mod(lua, "c", {{"b", "*"}, {"d", "*"}});
     _create_mod(lua, "d", {});
 
     auto order = lua.get_mod_manager().calculate_loading_order();
@@ -295,7 +313,7 @@ TEST_CASE(
 {
     elona::lua::LuaEnv lua;
 
-    _create_mod(lua, "a", {"b", "c"});
+    _create_mod(lua, "a", {{"b", "*"}, {"c", "*"}});
     _create_mod(lua, "b", {});
 
     REQUIRE_THROWS(lua.get_mod_manager().calculate_loading_order());
@@ -307,9 +325,9 @@ TEST_CASE(
 {
     elona::lua::LuaEnv lua;
 
-    _create_mod(lua, "a", {"b"});
-    _create_mod(lua, "b", {"c"});
-    _create_mod(lua, "c", {"a"});
+    _create_mod(lua, "a", {{"b", "*"}});
+    _create_mod(lua, "b", {{"c", "*"}});
+    _create_mod(lua, "c", {{"a", "*"}});
 
     REQUIRE_THROWS(lua.get_mod_manager().calculate_loading_order());
 }

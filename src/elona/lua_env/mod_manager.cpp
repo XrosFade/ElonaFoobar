@@ -80,7 +80,7 @@ void report_error(sol::error err)
 }
 
 
-void ModManager::clear_map_local_data()
+void ModManager::clear_map_local_stores()
 {
     for (auto&& pair : mods)
     {
@@ -93,7 +93,7 @@ local function clear(t)
     end
 end
 if Store then
-    clear(Store.map_local)
+    clear(Store.map)
 end
 )",
             mod->env);
@@ -144,12 +144,13 @@ void ModManager::scan_mod(const fs::path& mod_dir)
     if (!fs::exists(manifest_path))
     {
         throw std::runtime_error(
-            "Could not find mod manifest at " + manifest_path.string());
+            "Could not find mod manifest at " +
+            filepathutil::to_utf8_path(manifest_path));
     }
 
     ModManifest manifest = ModManifest::load(manifest_path);
 
-    const std::string mod_name = mod_dir.filename().string();
+    const std::string& mod_name = manifest.name;
     ELONA_LOG("lua.mod") << "Found mod " << mod_name;
 
     if (!_is_alnum_only(mod_name))
@@ -175,12 +176,10 @@ void ModManager::scan_all_mods(const fs::path& mods_dir)
         throw std::runtime_error("Mods have already been scanned!");
     }
 
-    const std::string init_script = "init.lua";
-
     for (const auto& entry : filesystem::dir_entries(
              mods_dir, filesystem::DirEntryRange::Type::dir))
     {
-        if (fs::exists(entry.path() / init_script))
+        if (fs::exists(entry.path() / "init.lua"))
         {
             scan_mod(entry.path());
         }
@@ -227,7 +226,6 @@ void ModManager::load_scanned_mods()
         ELONA_LOG("lua.mod") << "Loaded mod " << mod->manifest.name;
     }
 
-    lua_->get_event_manager().run_callbacks<EventKind::all_mods_loaded>();
     lua_->get_export_manager().register_all_exports();
 
     stage = ModLoadingStage::all_mods_loaded;
@@ -251,7 +249,7 @@ void ModManager::run_startup_script(const std::string& name)
         script_mod->env);
 
     // Bypass read-only metatable
-    script_mod->env.raw_set("data", lua_->get_data_manager().get().storage);
+    script_mod->env.raw_set("data", lua_->get_data_manager().get().storage());
 
     ELONA_LOG("lua.mod") << "Loaded startup script " << name;
     txt(i18n::s.get("core.locale.mod.loaded_script", name),
@@ -272,7 +270,7 @@ local function clear(t)
     end
 end
 if Store then
-    clear(Store.map_local)
+    clear(Store.map)
     clear(Store.global)
 end
 )",
@@ -314,9 +312,9 @@ void ModManager::bind_store(sol::state& lua, ModInfo& mod, sol::table& table)
     sol::table Store = lua.create_table();
     sol::table metatable = lua.create_table();
 
-    // Bind Store.global and Store.map_local.
+    // Bind Store.global and Store.map.
     metatable["global"] = mod.store_global;
-    metatable["map_local"] = mod.store_local;
+    metatable["map"] = mod.store_map;
 
     // Prevent creating new variables in the Store table.
     metatable[sol::meta_function::new_index] = deny;
@@ -408,17 +406,34 @@ std::vector<std::string> ModManager::calculate_loading_order()
         const auto& mod = pair.second;
         sorter.add(mod->manifest.name);
 
-        for (const auto& dependency : mod->manifest.dependencies)
+        for (const auto& pair : mod->manifest.dependencies)
         {
-            if (mods.find(dependency) == mods.end())
+            const auto& mod_name = pair.first;
+            const auto& version_req = pair.second;
+
+            const auto itr = mods.find(mod_name);
+            if (itr == mods.end())
             {
                 throw std::runtime_error(
-                    "The dependency '" + dependency + "' of mod '" +
+                    "The dependency '" + mod_name + "' of mod '" +
                     mod->manifest.name +
                     "' could not be found in the list of scanned mods.");
             }
+            const auto& ver = itr->second->manifest.version;
+            if (!version_req.is_satisfied(ver))
+            {
+                // Error message example:
+                // The dependency requirement 'base' (>= 2.0.0) of mod 'derived'
+                // could not be satisfied by 'base v1.5.0'.
+                std::stringstream ss;
+                ss << "The dependency requirement '" << mod_name << "' ("
+                   << version_req.to_string() << ") of mod '"
+                   << mod->manifest.name << "'could not be satisfied by '"
+                   << mod_name << " v" << ver.to_string() << "'.";
+                throw std::runtime_error(ss.str());
+            }
 
-            sorter.add_dependency(mod->manifest.name, dependency);
+            sorter.add_dependency(mod->manifest.name, mod_name);
         }
     }
 

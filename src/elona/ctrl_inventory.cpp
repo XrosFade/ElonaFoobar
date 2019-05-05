@@ -673,7 +673,7 @@ label_20591:
         }
         if (invctrl == 28)
         {
-            int stat = item_find(622, 3, 1);
+            int stat = item_find(622, 3, ItemFindLocation::player_inventory);
             if (stat != -1)
             {
                 p = inv[stat].number();
@@ -697,8 +697,7 @@ label_20591:
             }
         }
     }
-    gsel(3);
-    picload(filesystem::dir::graphic() / u8"deco_inv.bmp", 960, 96, false);
+    asset_load("deco_inv");
     gsel(0);
     if (returnfromidentify == 0)
     {
@@ -986,7 +985,7 @@ label_2061_internal:
         if (invctrl != 3 && invctrl != 11 && invctrl != 22 && invctrl != 27 &&
             invctrl != 28)
         {
-            if (p >= 5080)
+            if (p >= ELONA_ITEM_ON_GROUND_INDEX)
             {
                 s += i18n::space_if_needed() + "(" +
                     i18n::s.get("core.locale.ui.inv.window.ground") + ")";
@@ -1966,7 +1965,7 @@ label_2061_internal:
                 result.turn_result = TurnResult::pc_turn_user_error;
                 return result;
             }
-            if (chipm(7, cell_data.at(tlocx, tlocy).chip_id_actual) & 4)
+            if (chip_data.for_cell(tlocx, tlocy).effect & 4)
             {
                 txt(i18n::s.get(
                     "core.locale.ui.inv.throw.location_is_blocked"));
@@ -1995,7 +1994,7 @@ label_2061_internal:
                 snd("core.fail1");
                 goto label_20591;
             }
-            int stat = item_find(622, 3, 1);
+            int stat = item_find(622, 3, ItemFindLocation::player_inventory);
             if (stat != -1)
             {
                 i = stat;

@@ -6,7 +6,10 @@ namespace elona
 namespace lua
 {
 
-static std::string _read_mod_name(const hcl::Value& value, const fs::path& path)
+namespace
+{
+
+std::string _read_mod_name(const hcl::Value& value, const fs::path& path)
 {
     std::string result;
 
@@ -19,61 +22,114 @@ static std::string _read_mod_name(const hcl::Value& value, const fs::path& path)
     else
     {
         throw std::runtime_error(
-            path.string() + ": Missing \"name\" in mod manifest");
+            filepathutil::to_utf8_path(path) +
+            ": Missing \"name\" in mod manifest");
     }
 
     return result;
 }
 
-static std::unordered_set<std::string> _read_dependencies(
+
+
+semver::Version _read_mod_version(const hcl::Value& value, const fs::path& path)
+{
+    // TODO: Clean up, as with lua::ConfigTable
+    const hcl::Value* object = value.find("version");
+    if (!object)
+    {
+        return semver::Version{};
+    }
+
+    if (object->is<std::string>())
+    {
+        if (const auto result =
+                semver::Version::parse(object->as<std::string>()))
+        {
+            return result.right();
+        }
+        else
+        {
+            throw std::runtime_error{result.left()};
+        }
+    }
+    else
+    {
+        throw std::runtime_error(
+            filepathutil::to_utf8_path(path) +
+            ": Missing \"name\" in mod manifest");
+    }
+}
+
+
+
+ModManifest::Dependencies _read_dependencies(
     const hcl::Value& value,
     const fs::path& path)
 {
-    std::unordered_set<std::string> result;
+    ModManifest::Dependencies result;
 
     const hcl::Value* object = value.find("dependencies");
     if (object)
     {
-        if (object->is<hcl::List>())
+        if (object->is<hcl::Object>())
         {
-            auto dependencies = object->as<hcl::List>();
+            const auto& dependencies = object->as<hcl::Object>();
 
-            for (const auto& value : dependencies)
+            for (const auto& kvp : dependencies)
             {
-                if (value.is<std::string>())
+                hcl::Value mod;
+                hcl::Value version;
+                std::tie(mod, version) = kvp;
+
+                if (mod.is<std::string>() && version.is<std::string>())
                 {
-                    result.insert(value.as<std::string>());
+                    if (const auto req = semver::VersionRequirement::parse(
+                            version.as<std::string>()))
+                    {
+                        result.emplace(mod.as<std::string>(), req.right());
+                    }
+                    else
+                    {
+                        throw std::runtime_error(
+                            filepathutil::to_utf8_path(path) + ": " +
+                            req.left());
+                    }
                 }
                 else
                 {
                     throw std::runtime_error(
-                        path.string() +
-                        ": \"dependencies\" field must be a list of "
-                        "strings.");
+                        filepathutil::to_utf8_path(path) +
+                        ": \"dependencies\" field must be an object.");
                 }
             }
         }
         else
         {
             throw std::runtime_error(
-                path.string() +
-                ": \"dependencies\" field must be a list of strings.");
+                filepathutil::to_utf8_path(path) +
+                ": \"dependencies\" field must be an object.");
         }
     }
 
     return result;
 }
 
+} // namespace
+
+
+
 ModManifest ModManifest::load(const fs::path& path)
 {
     auto parsed = hclutil::load(path);
-    const auto& value = hclutil::skip_sections(parsed, {"mod"}, path.string());
+    const auto& value = hclutil::skip_sections(
+        parsed, {"mod"}, filepathutil::to_utf8_path(path));
 
-    std::string mod_name = _read_mod_name(value, path);
-    fs::path mod_path = path.parent_path();
-    auto dependencies = _read_dependencies(value, path);
+    const auto mod_name = _read_mod_name(value, path);
+    const auto version = _read_mod_version(value, path);
+    const auto mod_path = path.parent_path();
+    const auto dependencies = _read_dependencies(value, path);
 
-    return ModManifest{mod_name, mod_path, dependencies};
+    return ModManifest{mod_name, version, mod_path, dependencies};
 }
 
 } // namespace lua

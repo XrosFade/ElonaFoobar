@@ -634,8 +634,7 @@ TurnResult blending_menu()
     elona_vector1<int> blendchecklist;
     step = -1;
     rpid = 0;
-    gsel(3);
-    picload(filesystem::dir::graphic() / u8"deco_blend.bmp", 960, 96, false);
+    asset_load("deco_blend");
     gsel(0);
     clear_rprefmat();
 label_1923:
@@ -919,7 +918,7 @@ label_1928_internal:
         p = list(0, p);
         s = itemname(p, inv[p].number());
         s = strmid(s, 0, 28);
-        if (p >= 5080)
+        if (p >= ELONA_ITEM_ON_GROUND_INDEX)
         {
             s += i18n::s.get("core.locale.blending.steps.ground");
         }

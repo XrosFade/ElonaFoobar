@@ -20,10 +20,11 @@
 #include "keybind/keybind.hpp"
 #include "loading_screen.hpp"
 #include "lua_env/api_manager.hpp"
+#include "lua_env/console.hpp"
 #include "lua_env/data_manager.hpp"
 #include "lua_env/event_manager.hpp"
-#include "lua_env/lua_console.hpp"
 #include "lua_env/lua_env.hpp"
+#include "lua_env/lua_event/base_event.hpp"
 #include "lua_env/mod_manager.hpp"
 #include "map.hpp"
 #include "mef.hpp"
@@ -62,28 +63,6 @@ void load_character_sprite()
     usernpcmax = 0;
     DIM3(userdata, 70, 1);
     SDIM4(userdatan, 40, 10, 1);
-    buffer(5, 1584, (25 + (usernpcmax / 33 + 1) * 2) * 48);
-
-    picload(filesystem::dir::graphic() / u8"character.bmp", 0, 0, false);
-    picload(filesystem::dir::graphic() / u8"bufficon.png", 640, 1120, false);
-
-    gmode(0);
-    gsel(5);
-    if (fs::exists(filesystem::dir::user() / u8"graphic"))
-    {
-        for (const auto& entry : filesystem::dir_entries(
-                 filesystem::dir::user() / u8"graphic",
-                 filesystem::DirEntryRange::Type::file,
-                 std::regex{u8R"(chara_.*\.bmp)"}))
-        {
-            const auto file =
-                filepathutil::to_utf8_path(entry.path().filename());
-            p = elona::stoi(strmid(file, 6, instr(file, 6, u8"."s)));
-            picload(
-                entry.path(), p % 33 * inf_tiles, p / 33 * inf_tiles, false);
-        }
-    }
-    gsel(0);
 }
 
 
@@ -94,8 +73,8 @@ void initialize_screen()
 
     if (defines::is_android)
     {
-        display_mode = Config::instance().get<std::string>(
-            "core.config.screen.window_mode");
+        display_mode =
+            Config::instance().get<std::string>("core.screen.window_mode");
     }
 
     title(
@@ -168,6 +147,9 @@ void initialize_lua()
     // Set "data" table on all loaded mod environments.
     data::initialize(data_manager.get());
 
+    // Remove unknown event types from the event tables.
+    lua::lua->get_event_manager().remove_unknown_events();
+
     // Run user/console.lua.
     lua::lua->get_console().run_userscript();
 }
@@ -214,18 +196,21 @@ void initialize_i18n()
         {filesystem::dir::locale() / language, "core"}};
 
     // Load translations for each mod.
-    for (const auto& pair : lua::lua->get_mod_manager())
+    for (const auto& entry : filesystem::dir_entries(
+             filesystem::dir::mod(), filesystem::DirEntryRange::Type::dir))
     {
-        const auto& mod = pair.second;
-        if (mod->manifest.path)
+        const auto manifest_path = entry.path() / "mod.hcl";
+        if (fs::exists(manifest_path))
         {
-            const auto path = *mod->manifest.path / "locale" / language;
-            if (fs::exists(path))
+            lua::ModManifest manifest = lua::ModManifest::load(manifest_path);
+            const auto locale_path = entry.path() / "locale" / language;
+            if (fs::exists(locale_path))
             {
-                locations.emplace_back(path, mod->manifest.name);
+                locations.emplace_back(locale_path, manifest.name);
             }
         }
     }
+
     i18n::s.init(locations);
 }
 
@@ -237,27 +222,8 @@ void initialize_elona()
     gsel(0);
     boxf();
     redraw();
-    buffer(3, 1440, 800);
-    picload(filesystem::dir::graphic() / u8"interface.bmp", 0, 0, false);
 
     mesbox(keylog);
-
-    picload(filesystem::dir::graphic() / u8"interface_ex1.png", 0, 656, false);
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex2.png", 144, 656, false);
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex3.png", 144, 752, false);
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex4.png", 456, 144, false);
-
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex5.png", 528, 216, false);
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex6.png", 672, 216, false);
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex7.png", 864, 533, false);
-    picload(
-        filesystem::dir::graphic() / u8"interface_ex8.png", 864, 565, false);
 
     buffer(4, windoww, windowh);
     buffer(8, windoww, windowh);
@@ -626,7 +592,8 @@ void initialize_debug_globals()
     game_data.date.minute = 10;
     game_data.played_scene = 50;
     game_data.has_not_been_to_vernis = 1;
-    area_data[7].outer_map = 4;
+    area_data[static_cast<int>(mdata_t::MapId::your_home)].outer_map =
+        static_cast<int>(mdata_t::MapId::north_tyris);
     game_data.destination_outer_map =
         area_data[game_data.current_map].outer_map;
     game_data.acquirable_feat_count = 2;
@@ -699,8 +666,7 @@ void initialize_game()
     {
         load_save_data();
 
-        if (Config::instance().get<bool>(
-                "core.config.foobar.run_script_in_save"))
+        if (Config::instance().get<bool>("core.foobar.run_script_in_save"))
         {
             will_load_script = true;
         }
@@ -718,8 +684,31 @@ void initialize_game()
 
     if (script_loaded)
     {
-        lua::lua->get_event_manager()
-            .run_callbacks<lua::EventKind::script_loaded>();
+        lua::lua->get_event_manager().trigger(
+            lua::BaseEvent("core.script_loaded"));
+    }
+}
+
+
+
+void initialize_config_defs()
+{
+    Config::instance().clear();
+
+    // Somewhat convoluted as mods haven't been loaded yet by the mod manager.
+    for (const auto& entry : filesystem::dir_entries(
+             filesystem::dir::mod(), filesystem::DirEntryRange::Type::dir))
+    {
+        const auto manifest_path = entry.path() / "mod.hcl";
+        if (fs::exists(manifest_path))
+        {
+            lua::ModManifest manifest = lua::ModManifest::load(manifest_path);
+            const auto config_def_path = entry.path() / "config_def.hcl";
+            if (fs::exists(config_def_path))
+            {
+                Config::instance().load_def(config_def_path, manifest.name);
+            }
+        }
     }
 }
 
@@ -728,12 +717,11 @@ void initialize_game()
 void init()
 {
     const fs::path config_file = filesystem::dir::exe() / u8"config.hcl";
-    const fs::path config_def_file =
-        filesystem::dir::mod() / u8"core"s / u8"config"s / u8"config_def.hcl"s;
 
     lua::lua = std::make_unique<lua::LuaEnv>();
 
-    Config::instance().init(config_def_file);
+    initialize_config_defs();
+
     initialize_config_preload(config_file);
 
     initialize_screen();
@@ -757,7 +745,7 @@ void init()
         if (jp)
         {
             // TODO: work around
-            Config::instance().set("core.config.font.vertical_offset", -3);
+            Config::instance().set("core.font.vertical_offset", -3);
         }
     }
 

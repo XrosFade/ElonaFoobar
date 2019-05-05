@@ -23,6 +23,8 @@
 #include "menu.hpp"
 #include "message.hpp"
 #include "network.hpp"
+#include "pic_loader/pic_loader.hpp"
+#include "pic_loader/tinted_buffers.hpp"
 #include "quest.hpp"
 #include "random.hpp"
 #include "trait.hpp"
@@ -331,8 +333,7 @@ bool maybe_show_ex_help(int id, bool should_update_screen)
 
 void show_ex_help(int id)
 {
-    gsel(3);
-    picload(filesystem::dir::graphic() / u8"deco_help.bmp", 960, 96, false);
+    asset_load("deco_help");
     gsel(0);
     page = 0;
     notesel(buff);
@@ -680,8 +681,7 @@ int change_appearance()
     wy = winposy(wh);
     snd("core.port");
     window_animation(wx, wy, ww, wh, 9, 7);
-    gsel(3);
-    picload(filesystem::dir::graphic() / u8"deco_mirror.bmp", 960, 96, false);
+    asset_load("deco_mirror");
     gsel(0);
     windowshadow = 1;
 label_2040_internal:
@@ -786,7 +786,7 @@ label_2041_internal:
         const auto width = is_fullscale ? (32 * 2) : (24 * 2);
         const auto height = is_fullscale ? (48 * 2) : (40 * 2);
         gcopy_c(
-            20 + cc,
+            cc + 10 + PicLoader::max_buffers + TintedBuffers::max_buffers,
             f / 4 % 4 * 32,
             f / 16 % 4 * 48,
             32,
@@ -1014,7 +1014,7 @@ int change_appearance_equipment()
         window2(wx + 234, wy + 60, 88, 120, 1, 1);
         gmode(2);
         gcopy_c(
-            20 + cc,
+            cc + 10 + PicLoader::max_buffers + TintedBuffers::max_buffers,
             f / 4 % 4 * 32,
             f / 16 % 4 * 48,
             32,
