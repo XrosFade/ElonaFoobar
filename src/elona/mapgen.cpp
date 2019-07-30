@@ -15,6 +15,19 @@
 #include "random.hpp"
 #include "variables.hpp"
 
+
+
+namespace
+{
+
+int tile_board;
+int tile_townboard;
+int tile_votebox;
+
+} // namespace
+
+
+
 namespace elona
 {
 
@@ -1322,8 +1335,7 @@ int map_trap(int x, int y, int, int trap_type)
             dx_at_m170 = x;
             dy_at_m170 = y;
         }
-        if ((chipm(7, cell_data.at(dx_at_m170, dy_at_m170).chip_id_actual) &
-             4) == 0)
+        if ((chip_data.for_cell(dx_at_m170, dy_at_m170).effect & 4) == 0)
         {
             if (cell_data.at(dx_at_m170, dy_at_m170).feats == 0)
             {
@@ -1389,8 +1401,7 @@ int map_web(int x, int y, int power)
             dx_at_m170 = x;
             dy_at_m170 = y;
         }
-        if ((chipm(7, cell_data.at(dx_at_m170, dy_at_m170).chip_id_actual) &
-             4) == 0)
+        if ((chip_data.for_cell(dx_at_m170, dy_at_m170).effect & 4) == 0)
         {
             if (cell_data.at(dx_at_m170, dy_at_m170).feats == 0)
             {
@@ -1426,8 +1437,7 @@ int map_barrel(int x, int y)
             dx_at_m170 = x;
             dy_at_m170 = y;
         }
-        if ((chipm(7, cell_data.at(dx_at_m170, dy_at_m170).chip_id_actual) &
-             4) == 0)
+        if ((chip_data.for_cell(dx_at_m170, dy_at_m170).effect & 4) == 0)
         {
             if (cell_data.at(dx_at_m170, dy_at_m170).feats == 0)
             {
@@ -1575,6 +1585,8 @@ void generate_debug_map()
     map_data.max_crowd_density = map_data.width * map_data.height / 100;
     map_data.tileset = 3;
     map_data.user_map_flag = 0;
+    map_data.type = static_cast<int>(mdata_t::MapType::shelter);
+    map_data.refresh_type = 1;
     map_initialize();
 
     for (int y = 0; y < map_data.height; ++y)
@@ -2820,7 +2832,7 @@ int initialize_quest_map_party()
         x = rnd(map_data.width);
         y = rnd(map_data.height);
         if (cell_data.at(x, y).item_appearances_actual != 0 ||
-            chipm(7, cell_data.at(x, y).chip_id_actual) & 4)
+            chip_data.for_cell(x, y).effect & 4)
         {
             continue;
         }
@@ -3642,35 +3654,33 @@ void map_tileset(int tileset_type)
     }
     if (tileset_type == 4)
     {
-        tile_default = 0;
-        tile_fog = 528;
-        if (4 <= game_data.stood_world_map_tile &&
-            game_data.stood_world_map_tile < 9)
+        switch (map_get_field_type())
         {
+        case FieldMapType::plain_field:
+            tile_default = 0;
+            tile_fog = 528;
+            break;
+        case FieldMapType::forest:
             tile_default = 7;
             tile_fog = 528;
-        }
-        if (264 <= game_data.stood_world_map_tile &&
-            game_data.stood_world_map_tile < 363)
-        {
+            break;
+        case FieldMapType::sea:
             tile_default = 12;
-        }
-        if (9 <= game_data.stood_world_map_tile &&
-            game_data.stood_world_map_tile < 13)
-        {
             tile_fog = 528;
+            break;
+        case FieldMapType::grassland:
             tile_default = 3;
-        }
-        if (13 <= game_data.stood_world_map_tile &&
-            game_data.stood_world_map_tile < 17)
-        {
-            tile_fog = 531;
+            tile_fog = 528;
+            break;
+        case FieldMapType::desert:
             tile_default = 19;
-        }
-        if (chipm(0, game_data.stood_world_map_tile) == 4)
-        {
-            tile_fog = 532;
+            tile_fog = 531;
+            break;
+        case FieldMapType::snow_field:
             tile_default = 45;
+            tile_fog = 532;
+            break;
+        default: assert(0); break;
         }
     }
 }
@@ -3773,5 +3783,37 @@ void map_initcustom(const std::string& map_filename)
 }
 
 
+
+FieldMapType map_get_field_type()
+{
+    const auto T = game_data.stood_world_map_tile;
+
+    if (4 <= T && T < 9)
+    {
+        return FieldMapType::forest;
+    }
+    else if (264 <= T && T < 363)
+    {
+        return FieldMapType::sea;
+    }
+    else if (9 <= T && T < 13)
+    {
+        return FieldMapType::grassland;
+    }
+    else if (13 <= T && T < 17)
+    {
+        return FieldMapType::desert;
+    }
+    else if (
+        (26 <= T && T <= 32) || (568 <= T && T <= 570) ||
+        (198 <= T && T <= 230))
+    {
+        return FieldMapType::snow_field;
+    }
+    else
+    {
+        return FieldMapType::plain_field;
+    }
+}
 
 } // namespace elona

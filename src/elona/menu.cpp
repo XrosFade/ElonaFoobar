@@ -23,6 +23,8 @@
 #include "menu.hpp"
 #include "message.hpp"
 #include "network.hpp"
+#include "pic_loader/pic_loader.hpp"
+#include "pic_loader/tinted_buffers.hpp"
 #include "quest.hpp"
 #include "random.hpp"
 #include "trait.hpp"
@@ -295,12 +297,13 @@ void text_set()
         _melee(1, 7) = u8"attack"s;
         _melee(2, 7) = u8"spore"s;
     }
-    homepage = i18n::s.get("core.locale.system.lafrontier_homepage");
 }
+
+
 
 bool maybe_show_ex_help(int id, bool should_update_screen)
 {
-    if (Config::instance().extrahelp)
+    if (Config::instance().extra_help)
     {
         if (game_data.exhelp_flags.at(id) == 0)
         {
@@ -309,8 +312,7 @@ bool maybe_show_ex_help(int id, bool should_update_screen)
                 if (cdata.player().continuous_action.turn == 0)
                 {
                     game_data.exhelp_flags.at(id) = 1;
-                    ghelp = id;
-                    show_ex_help();
+                    show_ex_help(id);
 
                     if (should_update_screen)
                     {
@@ -327,18 +329,19 @@ bool maybe_show_ex_help(int id, bool should_update_screen)
     return false;
 }
 
-void show_ex_help()
+
+
+void show_ex_help(int id)
 {
-    gsel(3);
-    pos(960, 96);
-    picload(filesystem::dir::graphic() / u8"deco_help.bmp", 1);
+    asset_load("deco_help");
     gsel(0);
     page = 0;
     notesel(buff);
     {
         buff(0).clear();
-        std::ifstream in{(filesystem::dir::data() / u8"exhelp.txt").native(),
-                         std::ios::binary};
+        std::ifstream in{
+            (i18n::s.get_locale_dir("core") / "lazy" / "exhelp.txt").native(),
+            std::ios::binary};
         std::string tmp;
         while (std::getline(in, tmp))
         {
@@ -346,11 +349,11 @@ void show_ex_help()
         }
     }
     p = instr(
-        buff, 0, u8"%"s + ghelp + u8","s + i18n::s.get("core.locale.meta.tag"));
+        buff, 0, u8"%"s + id + u8","s + i18n::s.get("core.locale.meta.tag"));
     if (p == -1)
     {
         dialog(
-            u8"help index not found %"s + ghelp + u8","s +
+            u8"help index not found %"s + id + u8","s +
             i18n::s.get("core.locale.meta.tag"));
         return;
     }
@@ -371,12 +374,9 @@ void show_ex_help()
         wy = winposy(dy);
         window2(
             (windoww - 325) / 2 + inf_screenx, winposy(dy) + 6, 325, 32, 0, 1);
-        pos(wx + 5, wy + 4);
-        gcopy(3, 960, 96, 48, 48);
-        pos(wx + dx - 55, wy + 4);
-        gcopy(3, 960, 96, 48, 48);
-        pos(wx + 10, wy + 42);
-        gcopy(3, 960, 144, 96, 120);
+        draw("deco_help_a", wx + 5, wy + 4);
+        draw("deco_help_a", wx + dx - 55, wy + 4);
+        draw("deco_help_b", wx + 10, wy + 42);
         font(16 - en * 2, snail::Font::Style::bold);
         bmes(
             i18n::s.get("core.locale.ui.exhelp.title"),
@@ -398,9 +398,7 @@ void show_ex_help()
                 {
                     break;
                 }
-                color(30, 30, 30);
                 const auto ny = gmes(s, tx, y, 330, {30, 30, 30}, true).y;
-                color(0, 0, 0);
                 y = ny;
             }
         }
@@ -683,270 +681,295 @@ int change_appearance()
     wy = winposy(wh);
     snd("core.port");
     window_animation(wx, wy, ww, wh, 9, 7);
-    gsel(3);
-    pos(960, 96);
-    picload(filesystem::dir::graphic() / u8"deco_mirror.bmp", 1);
+    asset_load("deco_mirror");
     gsel(0);
     windowshadow = 1;
-label_2040_internal:
-    listmax = 0;
-    if (page == 0)
+
+    bool init = true;
+
+    while (true)
     {
-        s(0) = i18n::s.get("core.locale.ui.appearance.basic.done");
-        s(1) = i18n::s.get("core.locale.ui.appearance.basic.portrait");
-        s(2) = i18n::s.get("core.locale.ui.appearance.basic.hair");
-        s(3) = i18n::s.get("core.locale.ui.appearance.basic.sub_hair");
-        s(4) = i18n::s.get("core.locale.ui.appearance.basic.hair_color");
-        s(5) = i18n::s.get("core.locale.ui.appearance.basic.body");
-        s(6) = i18n::s.get("core.locale.ui.appearance.basic.cloth");
-        s(7) = i18n::s.get("core.locale.ui.appearance.basic.pants");
-        s(8) = i18n::s.get("core.locale.ui.appearance.basic.set_detail");
-        if (cc != 0)
+        if (init)
         {
-            s(9) = i18n::s.get("core.locale.ui.appearance.basic.custom");
+            init = false;
+            listmax = 0;
+            if (page == 0)
+            {
+                s(0) = i18n::s.get("core.locale.ui.appearance.basic.done");
+                s(1) = i18n::s.get("core.locale.ui.appearance.basic.portrait");
+                s(2) = i18n::s.get("core.locale.ui.appearance.basic.hair");
+                s(3) = i18n::s.get("core.locale.ui.appearance.basic.sub_hair");
+                s(4) =
+                    i18n::s.get("core.locale.ui.appearance.basic.hair_color");
+                s(5) = i18n::s.get("core.locale.ui.appearance.basic.body");
+                s(6) = i18n::s.get("core.locale.ui.appearance.basic.cloth");
+                s(7) = i18n::s.get("core.locale.ui.appearance.basic.pants");
+                s(8) =
+                    i18n::s.get("core.locale.ui.appearance.basic.set_detail");
+                if (cc != 0)
+                {
+                    s(9) =
+                        i18n::s.get("core.locale.ui.appearance.basic.custom");
+                }
+                else
+                {
+                    s(9) =
+                        i18n::s.get("core.locale.ui.appearance.basic.riding");
+                }
+                p = 9 + (cc != 0) + (cc == 0) * (game_data.mount != 0);
+            }
+            else
+            {
+                s(0) =
+                    i18n::s.get("core.locale.ui.appearance.detail.body_color");
+                s(1) =
+                    i18n::s.get("core.locale.ui.appearance.detail.cloth_color");
+                s(2) =
+                    i18n::s.get("core.locale.ui.appearance.detail.pants_color");
+                s(3) = i18n::s.get("core.locale.ui.appearance.detail.etc_1");
+                s(4) = i18n::s.get("core.locale.ui.appearance.detail.etc_2");
+                s(5) = i18n::s.get("core.locale.ui.appearance.detail.etc_3");
+                s(6) = i18n::s.get("core.locale.ui.appearance.detail.eyes");
+                s(7) =
+                    i18n::s.get("core.locale.ui.appearance.detail.set_basic");
+                p = 8;
+            }
+            for (int cnt = 0, cnt_end = (p); cnt < cnt_end; ++cnt)
+            {
+                list(0, cnt) = cnt;
+                listn(0, cnt) = s(cnt);
+                ++listmax;
+            }
+            keyrange = 0;
+            for (int cnt = 0, cnt_end = (p); cnt < cnt_end; ++cnt)
+            {
+                p = cnt;
+                if (p >= listmax)
+                {
+                    break;
+                }
+                key_list(cnt) = key_enter;
+                ++keyrange;
+            }
+        }
+
+        pagesize = 0;
+        ui_display_window(
+            i18n::s.get("core.locale.ui.appearance.basic.title"),
+            i18n::s.get("core.locale.ui.appearance.hint"),
+            (windoww - 380) / 2 + inf_screenx,
+            winposy(340) - 12,
+            380,
+            340);
+        pagesize = listmax;
+        display_topic(
+            i18n::s.get("core.locale.ui.appearance.basic.category"),
+            wx + 34,
+            wy + 36);
+        draw("deco_mirror_a", wx + ww - 40, wy);
+        ++i;
+        if (i % 100 < 45)
+        {
+            f = i % 16;
         }
         else
         {
-            s(9) = i18n::s.get("core.locale.ui.appearance.basic.riding");
+            ++f;
         }
-        p = 9 + (cc != 0) + (cc == 0) * (game_data.mount != 0);
-    }
-    else
-    {
-        s(0) = i18n::s.get("core.locale.ui.appearance.detail.body_color");
-        s(1) = i18n::s.get("core.locale.ui.appearance.detail.cloth_color");
-        s(2) = i18n::s.get("core.locale.ui.appearance.detail.pants_color");
-        s(3) = i18n::s.get("core.locale.ui.appearance.detail.etc_1");
-        s(4) = i18n::s.get("core.locale.ui.appearance.detail.etc_2");
-        s(5) = i18n::s.get("core.locale.ui.appearance.detail.etc_3");
-        s(6) = i18n::s.get("core.locale.ui.appearance.detail.eyes");
-        s(7) = i18n::s.get("core.locale.ui.appearance.detail.set_basic");
-        p = 8;
-    }
-    for (int cnt = 0, cnt_end = (p); cnt < cnt_end; ++cnt)
-    {
-        list(0, cnt) = cnt;
-        listn(0, cnt) = s(cnt);
-        ++listmax;
-    }
-    keyrange = 0;
-    for (int cnt = 0, cnt_end = (p); cnt < cnt_end; ++cnt)
-    {
-        p = cnt;
-        if (p >= listmax)
+        window2(wx + 234, wy + 71, 88, 120, 1, 1);
+        if (cs == 1 && page == 0)
         {
-            break;
-        }
-        key_list(cnt) = key_enter;
-        ++keyrange;
-    }
-label_2041_internal:
-    pagesize = 0;
-    ui_display_window(
-        i18n::s.get("core.locale.ui.appearance.basic.title"),
-        i18n::s.get("core.locale.ui.appearance.hint"),
-        (windoww - 380) / 2 + inf_screenx,
-        winposy(340) - 12,
-        380,
-        340);
-    pagesize = listmax;
-    display_topic(
-        i18n::s.get("core.locale.ui.appearance.basic.category"),
-        wx + 34,
-        wy + 36);
-    pos(wx + ww - 40, wy);
-    gcopy(3, 960, 96, 48, 120);
-    ++i;
-    if (i % 100 < 45)
-    {
-        f = i % 16;
-    }
-    else
-    {
-        ++f;
-    }
-    window2(wx + 234, wy + 71, 88, 120, 1, 1);
-    if (cs == 1 && page == 0)
-    {
-        if (cdata[cc].portrait != "")
-        {
-            if (const auto rect = draw_get_rect_portrait(cdata[cc].portrait))
+            if (cdata[cc].portrait != "")
             {
-                pos(wx + 238, wy + 75);
-                gcopy(
-                    rect->buffer, rect->x, rect->y, rect->width, rect->height);
+                if (const auto rect =
+                        draw_get_rect_portrait(cdata[cc].portrait))
+                {
+                    gcopy(
+                        rect->buffer,
+                        rect->x,
+                        rect->y,
+                        rect->width,
+                        rect->height,
+                        wx + 238,
+                        wy + 75);
+                }
             }
         }
-    }
-    else if (cdata[cc].has_own_sprite() == 1)
-    {
-        pos(wx + 280, wy + 130);
+        else if (cdata[cc].has_own_sprite())
+        {
+            gmode(2);
+            const auto is_fullscale =
+                Config::instance().pcc_graphic_scale == "fullscale";
+            const auto width = is_fullscale ? (32 * 2) : (24 * 2);
+            const auto height = is_fullscale ? (48 * 2) : (40 * 2);
+            gcopy_c(
+                cc + 10 + PicLoader::max_buffers + TintedBuffers::max_buffers,
+                f / 4 % 4 * 32,
+                f / 16 % 4 * 48,
+                32,
+                48,
+                wx + 280,
+                wy + 130,
+                width,
+                height);
+        }
+        else
+        {
+            draw_chara(cdata[cc], wx + 280, wy + 130);
+        }
         gmode(2);
-        const auto is_fullscale =
-            Config::instance().pcc_graphic_scale == "fullscale";
-        const auto width = is_fullscale ? (32 * 2) : (24 * 2);
-        const auto height = is_fullscale ? (48 * 2) : (40 * 2);
-        gcopy_c(
-            20 + cc, f / 4 % 4 * 32, f / 16 % 4 * 48, 32, 48, width, height);
-    }
-    else
-    {
-        draw_chara(cdata[cc], wx + 280, wy + 130);
-    }
-    gmode(2);
-    font(14 - en * 2);
-    cs_listbk();
-    for (int cnt = 0, cnt_end = (pagesize); cnt < cnt_end; ++cnt)
-    {
-        p = cnt;
-        if (p >= listmax)
+        font(14 - en * 2);
+        cs_listbk();
+        for (int cnt = 0, cnt_end = (pagesize); cnt < cnt_end; ++cnt)
         {
-            break;
-        }
-        _set_pcc_info(cnt);
-        s = listn(0, p);
-        if (rtval >= 0)
-        {
-            if (rtval(2) >= 0)
+            p = cnt;
+            if (p >= listmax)
             {
-                s += u8" "s + rtval(2);
+                break;
             }
-            else if (rtval(2) == -1)
+            _set_pcc_info(cnt);
+            s = listn(0, p);
+            if (rtval >= 0)
             {
-                s += u8" N/A"s;
+                if (rtval(2) >= 0)
+                {
+                    s += u8" "s + rtval(2);
+                }
+                else if (rtval(2) == -1)
+                {
+                    s += u8" N/A"s;
+                }
+                else
+                {
+                    s += " " + rtvaln;
+                }
             }
-            else
+            cs_list(cs == cnt, s, wx + 60, wy + 66 + cnt * 21 - 1);
+            if (rtval != -2)
             {
-                s += " " + rtvaln;
+                draw("arrow_left", wx + 30, wy + 66 + cnt * 21 - 5);
+                draw("arrow_right", wx + 175, wy + 66 + cnt * 21 - 5);
             }
         }
-        cs_list(cs == cnt, s, wx + 60, wy + 66 + cnt * 21 - 1);
-        if (rtval != -2)
+        if (keyrange != 0)
         {
-            pos(wx + 30, wy + 66 + cnt * 21 - 5);
-            gcopy(3, 312, 336, 24, 24);
-            pos(wx + 175, wy + 66 + cnt * 21 - 5);
-            gcopy(3, 336, 336, 24, 24);
+            cs_bk = cs;
         }
-    }
-    if (keyrange != 0)
-    {
-        cs_bk = cs;
-    }
-    redraw();
-    auto action = cursor_check_ex();
-    _set_pcc_info(cs);
-    p = 0;
-    if (rtval == -2)
-    {
-        if (action == "enter")
+        redraw();
+        auto action = cursor_check_ex();
+        _set_pcc_info(cs);
+        p = 0;
+        if (rtval == -2)
         {
-            create_pcpic(cc);
-            return 1;
+            if (action == "enter")
+            {
+                create_pcpic(cc);
+                return 1;
+            }
+            if (action == "next_page" || action == "previous_page")
+            {
+                action = ""s;
+            }
         }
-        if (action == "next_page" || action == "previous_page")
+        else if (action == "enter")
         {
-            action = ""s;
+            action = "next_page";
         }
-    }
-    else if (action == "enter")
-    {
-        action = "next_page";
-    }
-    if (rtval == -1)
-    {
-        if (action == "next_page" || action == "previous_page")
+        if (rtval == -1)
+        {
+            if (action == "next_page" || action == "previous_page")
+            {
+                snd("core.cursor1");
+                if (page == 0)
+                {
+                    page = 1;
+                }
+                else
+                {
+                    page = 0;
+                    cs = 8;
+                }
+                init = true;
+                continue;
+            }
+        }
+        if (action == "next_page")
         {
             snd("core.cursor1");
-            if (page == 0)
+            if (rtval == 100)
             {
-                page = 1;
+                cdata[cc].portrait =
+                    the_portrait_db.get_next_portrait(cdata[cc].portrait);
+                continue;
             }
-            else
+            if (rtval == 101)
             {
-                page = 0;
-                cs = 8;
+                cdata[cc].has_own_sprite() = true;
+                continue;
             }
-            goto label_2040_internal;
-        }
-    }
-    if (action == "next_page")
-    {
-        snd("core.cursor1");
-        if (rtval == 100)
-        {
-            cdata[cc].portrait =
-                the_portrait_db.get_next_portrait(cdata[cc].portrait);
-            goto label_2041_internal;
-        }
-        if (rtval == 101)
-        {
-            cdata[cc].has_own_sprite() = true;
-            goto label_2041_internal;
-        }
-        if (rtval(1) == 0)
-        {
-            if (fs::exists(
-                    filesystem::dir::graphic() /
-                    (u8"pcc_"s + rtvaln + u8"_" + (pcc(rtval, cc) % 1000 + 1) +
-                     u8".bmp")))
+            if (rtval(1) == 0)
             {
-                ++pcc(rtval, cc);
+                if (fs::exists(
+                        filesystem::dir::graphic() /
+                        (u8"pcc_"s + rtvaln + u8"_" +
+                         (pcc(rtval, cc) % 1000 + 1) + u8".bmp")))
+                {
+                    ++pcc(rtval, cc);
+                    p = 1;
+                }
+            }
+            else if (pcc(rtval, cc) / 1000 < 21)
+            {
+                pcc(rtval, cc) += 1000;
                 p = 1;
             }
         }
-        else if (pcc(rtval, cc) / 1000 < 21)
+        if (action == "previous_page")
         {
-            pcc(rtval, cc) += 1000;
-            p = 1;
-        }
-    }
-    if (action == "previous_page")
-    {
-        snd("core.cursor1");
-        if (rtval == 100)
-        {
-            cdata[cc].portrait =
-                the_portrait_db.get_previous_portrait(cdata[cc].portrait);
-            goto label_2041_internal;
-        }
-        if (rtval == 101)
-        {
-            cdata[cc].has_own_sprite() = false;
-            goto label_2041_internal;
-        }
-        if (rtval(1) == 0)
-        {
-            if ((pcc(rtval, cc) % 1000 == 1 && rtval != 15) ||
-                fs::exists(
-                    filesystem::dir::graphic() /
-                    (u8"pcc_"s + rtvaln + u8"_"s + (pcc(rtval, cc) % 1000 - 1) +
-                     u8".bmp"s)))
+            snd("core.cursor1");
+            if (rtval == 100)
             {
-                --pcc(rtval, cc);
+                cdata[cc].portrait =
+                    the_portrait_db.get_previous_portrait(cdata[cc].portrait);
+                continue;
+            }
+            if (rtval == 101)
+            {
+                cdata[cc].has_own_sprite() = false;
+                continue;
+            }
+            if (rtval(1) == 0)
+            {
+                if ((pcc(rtval, cc) % 1000 == 1 && rtval != 15) ||
+                    fs::exists(
+                        filesystem::dir::graphic() /
+                        (u8"pcc_"s + rtvaln + u8"_"s +
+                         (pcc(rtval, cc) % 1000 - 1) + u8".bmp"s)))
+                {
+                    --pcc(rtval, cc);
+                    p = 1;
+                }
+            }
+            else if (pcc(rtval, cc) / 1000 > 0)
+            {
+                pcc(rtval, cc) -= 1000;
                 p = 1;
             }
         }
-        else if (pcc(rtval, cc) / 1000 > 0)
+        create_pcpic(cc, false);
+        if (action == "cancel")
         {
-            pcc(rtval, cc) -= 1000;
-            p = 1;
+            create_pcpic(cc);
+            return 0;
+        }
+        if (mode == 1)
+        {
+            if (getkey(snail::Key::f1))
+            {
+                return -1;
+            }
         }
     }
-    create_pcpic(cc, false);
-    if (action == "cancel")
-    {
-        create_pcpic(cc);
-        return 0;
-    }
-    if (mode == 1)
-    {
-        if (getkey(snail::Key::f1))
-        {
-            return -1;
-        }
-    }
-    goto label_2041_internal;
 }
 
 int change_appearance_equipment()
@@ -1007,9 +1030,17 @@ int change_appearance_equipment()
             ++f;
         }
         window2(wx + 234, wy + 60, 88, 120, 1, 1);
-        pos(wx + 280, wy + 120);
         gmode(2);
-        gcopy_c(20 + cc, f / 4 % 4 * 32, f / 16 % 4 * 48, 32, 48, 48, 80);
+        gcopy_c(
+            cc + 10 + PicLoader::max_buffers + TintedBuffers::max_buffers,
+            f / 4 % 4 * 32,
+            f / 16 % 4 * 48,
+            32,
+            48,
+            wx + 280,
+            wy + 120,
+            48,
+            80);
         gmode(2);
         font(14 - en * 2);
         cs_listbk();
@@ -1031,10 +1062,8 @@ int change_appearance_equipment()
                 {
                     s += u8"Off"s;
                 }
-                pos(wx + 30, wy + 66 + cnt * 21 - 5);
-                gcopy(3, 312, 336, 24, 24);
-                pos(wx + 175, wy + 66 + cnt * 21 - 5);
-                gcopy(3, 336, 336, 24, 24);
+                draw("arrow_left", wx + 30, wy + 66 + cnt * 21 - 5);
+                draw("arrow_right", wx + 175, wy + 66 + cnt * 21 - 5);
             }
             cs_list(cs == cnt, s, wx + 60, wy + 66 + cnt * 21 - 1);
         }
@@ -1124,15 +1153,14 @@ void show_weapon_dice(int val0)
 {
     tc = cc;
     font(12 + sizefix - en * 2, snail::Font::Style::bold);
-    color(20, 10, 0);
     if (val0 == 0)
     {
-        pos(wx + 590, wy + 281 + p(2) * 16);
-        mes(i18n::s.get("core.locale.ui.chara_sheet.damage.hit"));
-        pos(wx + 417, wy + 281 + p(2) * 16);
-        mes(s(1));
+        mes(wx + 590,
+            wy + 281 + p(2) * 16,
+            i18n::s.get("core.locale.ui.chara_sheet.damage.hit"),
+            {20, 10, 0});
+        mes(wx + 417, wy + 281 + p(2) * 16, s(1), {20, 10, 0});
     }
-    color(0, 0, 0);
     attackrange = 0;
     if (the_item_db[inv[cw].id]->category == 24000) // TODO coupling
     {
@@ -1146,8 +1174,7 @@ void show_weapon_dice(int val0)
     s = ""s + tohit + u8"%"s;
     if (val0 == 0)
     {
-        pos(wx + 625 - en * 8, wy + 279 + p(2) * 16);
-        mes(s);
+        mes(wx + 625 - en * 8, wy + 279 + p(2) * 16, s);
     }
     else
     {
@@ -1160,8 +1187,7 @@ void show_weapon_dice(int val0)
             3 + (elona::stoi(s(2)) >= 10) + (elona::stoi(s(2)) >= 100));
     if (val0 == 0)
     {
-        pos(wx + 460 + en * 8, wy + 279 + p(2) * 16);
-        mes(s);
+        mes(wx + 460 + en * 8, wy + 279 + p(2) * 16, s);
     }
     else
     {
@@ -1374,7 +1400,6 @@ label_1965_internal:
             break;
         }
         noteget(s, p);
-        pos(wx + 54, wy + 66 + cnt * 19 + 2);
         gmes(s, wx, wy + 66 + cnt * 19 + 2, 600, {30, 30, 30}, false);
     }
     redraw();

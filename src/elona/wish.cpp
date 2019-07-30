@@ -20,13 +20,13 @@
 #include "network.hpp"
 #include "optional.hpp"
 #include "random.hpp"
+#include "save.hpp"
 #include "variables.hpp"
 
 
 
 namespace
 {
-
 
 template <typename T, typename Similarity = int>
 class BySimilaritySelector
@@ -536,9 +536,9 @@ bool wish_for_item(const std::string& input)
 
     BySimilaritySelector<int> selector;
     const auto wish = fix_wish(input);
-    for (const auto& item_data : the_item_db)
+    for (const auto& item_data : the_item_db.values())
     {
-        const auto id = item_data.id;
+        const auto id = item_data.legacy_id;
 
         if (id == 0 || id == 23 || id == 290 || id == 289 || id == 361)
             continue;
@@ -678,9 +678,9 @@ bool wish_for_skill(const std::string& input)
     BySimilaritySelector<int> selector;
     const auto wish = fix_wish(input);
 
-    for (const auto& ability_data : the_ability_db)
+    for (const auto& ability_data : the_ability_db.values())
     {
-        const int id = ability_data.id;
+        const int id = ability_data.legacy_id;
         const bool is_basic_attribute_excluding_life_and_mana =
             10 <= id && id <= 19;
         const bool is_skill = 100 <= id && id <= 399;
@@ -770,7 +770,7 @@ bool process_wish()
 
     txt(i18n::s.get("core.locale.wish.your_wish", inputlog(0)));
 
-    autosave = 1 * (game_data.current_map != mdata_t::MapId::show_house);
+    save_set_autosave();
 
     log_copy_observer = std::make_unique<LogCopyObserver>();
     subscribe_log(log_copy_observer.get());

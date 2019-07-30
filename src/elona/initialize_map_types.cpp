@@ -3,14 +3,17 @@
 #include "character.hpp"
 #include "character_status.hpp"
 #include "ctrl_file.hpp"
+#include "data/types/type_map.hpp"
 #include "event.hpp"
 #include "gdata.hpp"
 #include "i18n.hpp"
 #include "itemgen.hpp"
+#include "lua_env/lua_class/lua_class_map_generator.hpp"
 #include "map.hpp"
 #include "map_cell.hpp"
 #include "mapgen.hpp"
 #include "quest.hpp"
+#include "text.hpp"
 #include "variables.hpp"
 
 namespace elona
@@ -1980,7 +1983,7 @@ static void _init_map_vernis_the_mine()
 static void _init_map_vernis_robbers_hideout()
 {
     map_data.tileset = 0;
-    map_initcustom(u8"sqrogue"s);
+    map_initcustom(u8"sqRogue"s);
     map_data.indoors_flag = 1;
     map_data.type = static_cast<int>(mdata_t::MapType::dungeon);
     map_data.max_crowd_density = 0;
@@ -2261,33 +2264,16 @@ static void _init_map_fields()
     }
 
     mdatan(0) = "";
-    if (4 <= game_data.stood_world_map_tile &&
-        game_data.stood_world_map_tile < 9)
+
+    switch (map_get_field_type())
     {
-        _init_map_fields_forest();
-    }
-    if (264 <= game_data.stood_world_map_tile &&
-        game_data.stood_world_map_tile < 363)
-    {
-        _init_map_fields_sea();
-    }
-    if (9 <= game_data.stood_world_map_tile &&
-        game_data.stood_world_map_tile < 13)
-    {
-        _init_map_fields_grassland();
-    }
-    if (13 <= game_data.stood_world_map_tile &&
-        game_data.stood_world_map_tile < 17)
-    {
-        _init_map_fields_desert();
-    }
-    if (chipm(0, game_data.stood_world_map_tile) == 4)
-    {
-        _init_map_fields_snow_field();
-    }
-    if (mdatan(0) == ""s)
-    {
-        _init_map_fields_plain_field();
+    case FieldMapType::plain_field: _init_map_fields_plain_field(); break;
+    case FieldMapType::forest: _init_map_fields_forest(); break;
+    case FieldMapType::sea: _init_map_fields_sea(); break;
+    case FieldMapType::grassland: _init_map_fields_grassland(); break;
+    case FieldMapType::desert: _init_map_fields_desert(); break;
+    case FieldMapType::snow_field: _init_map_fields_snow_field(); break;
+    default: assert(0); break;
     }
 
     map_placeplayer();
@@ -2441,23 +2427,7 @@ static void _init_map_dragons_nest()
     }
 }
 
-static void _init_map_puppy_cave()
-{
-    generate_random_nefia();
-    if (game_data.current_dungeon_level ==
-        area_data[game_data.current_map].deepest_level)
-    {
-        if (game_data.quest_flags.puppys_cave < 2)
-        {
-            if (chara_find_ally(225) == -1)
-            {
-                flt();
-                chara_create(-1, 225, -3, 0);
-                cdata[rc].does_not_search_enemy() = true;
-            }
-        }
-    }
-}
+
 
 static void _init_map_minotaurs_nest()
 {
@@ -2554,13 +2524,23 @@ void initialize_map_from_map_type()
     {
         mdatan(0) = mapname(game_data.current_map);
     }
+
+
     // In most cases the area's map ID will be the same as
-    // game_data.current_map. However, multiple player-owned areas can share the
-    // same map ID.
-    // TODO: use only area ID here.
-    MapId map_id =
-        static_cast<mdata_t::MapId>(area_data[game_data.current_map].id);
-    switch (map_id)
+    // game_data.current_map. However, multiple player-owned areas can share
+    // the same map ID.
+    int map_id = area_data[game_data.current_map].id;
+    auto map = the_mapdef_db[map_id];
+
+    if (map && map->generator)
+    {
+        lua::MapGenerator generator{};
+        map->generator->call(generator);
+        return;
+    }
+
+    MapId map_id_ = static_cast<mdata_t::MapId>(map_id);
+    switch (map_id_)
     {
         // clang-format off
     case mdata_t::MapId::shelter_:                   _init_map_shelter();                   break;
@@ -2575,8 +2555,8 @@ void initialize_map_from_map_type()
         // clang-format on
     }
 
-    map_id = static_cast<mdata_t::MapId>(game_data.current_map);
-    switch (map_id)
+    map_id_ = static_cast<mdata_t::MapId>(game_data.current_map);
+    switch (map_id_)
     {
         // clang-format off
     case mdata_t::MapId::quest:                      generate_random_nefia();               break;
@@ -2587,9 +2567,7 @@ void initialize_map_from_map_type()
     case mdata_t::MapId::embassy:                    _init_map_embassy();                   break;
     case mdata_t::MapId::test_world_north_border:    _init_map_test_world_north_border();   break;
     case mdata_t::MapId::north_tyris_south_border:
-    case mdata_t::MapId::south_tyris_north_border:
-        _init_map_tyris_border();
-        break;
+    case mdata_t::MapId::south_tyris_north_border:   _init_map_tyris_border();              break;
     case mdata_t::MapId::the_smoke_and_pipe:         _init_map_the_smoke_and_pipe();        break;
     case mdata_t::MapId::miral_and_garoks_workshop:  _init_map_miral_and_garoks_workshop(); break;
     case mdata_t::MapId::mansion_of_younger_sister:  _init_map_mansion_of_younger_sister(); break;
@@ -2619,7 +2597,6 @@ void initialize_map_from_map_type()
     case mdata_t::MapId::crypt_of_the_damned:        _init_map_crypt_of_the_damned();       break;
     case mdata_t::MapId::ancient_castle:             _init_map_ancient_castle();            break;
     case mdata_t::MapId::dragons_nest:               _init_map_dragons_nest();              break;
-    case mdata_t::MapId::puppy_cave:                 _init_map_puppy_cave();                break;
     case mdata_t::MapId::minotaurs_nest:             _init_map_minotaurs_nest();            break;
     case mdata_t::MapId::yeeks_nest:                 _init_map_yeeks_nest();                break;
     case mdata_t::MapId::pyramid:                    _init_map_pyramid();                   break;

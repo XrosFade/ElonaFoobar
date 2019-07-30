@@ -9,6 +9,7 @@
 #include "config/config.hpp"
 #include "ctrl_file.hpp"
 #include "data/types/type_item.hpp"
+#include "data/types/type_map.hpp"
 #include "draw.hpp"
 #include "i18n.hpp"
 #include "input.hpp"
@@ -30,8 +31,6 @@
 
 namespace
 {
-
-
 
 void prepare_house_board_tiles()
 {
@@ -75,19 +74,19 @@ void prepare_house_board_tiles()
         {
             continue;
         }
-        if (chipm(0, cnt) == 2)
+        if (chip_data[cnt].kind == 2)
         {
             continue;
         }
-        if (chipm(0, cnt) == 1)
+        if (chip_data[cnt].kind == 1)
         {
             continue;
         }
-        if (chipm(1, cnt) == 5)
+        if (chip_data[cnt].kind2 == 5)
         {
             continue;
         }
-        if (chipm(0, cnt) == 3)
+        if (chip_data[cnt].kind == 3)
         {
             if (game_data.home_scale <= 3)
             {
@@ -105,9 +104,9 @@ void prepare_house_board_tiles()
         }
         list(0, p) = cnt;
         ++p;
-        if (chipm(3, cnt) != 0)
+        if (chip_data[cnt].anime_frame != 0)
         {
-            cnt = cnt + chipm(3, cnt) - 1;
+            cnt = cnt + chip_data[cnt].anime_frame - 1;
             continue;
         }
     }
@@ -161,6 +160,18 @@ void add_heirloom_if_valuable_enough(
 
 
 
+bool _livestock_will_breed(const Character& breeder, int livestock_count)
+{
+    const auto B = chara_breed_power(breeder);
+    const auto L = livestock_count;
+
+    // The breeder has breed power big enough to breed compared to livestocks
+    // count, or if there is no livestocks, new one will be born in low
+    // probability regardless of the breed power.
+    return (rnd(5000) <= B * 100 / (100 + L * 20) - L * 2) ||
+        (L == 0 && rnd(30) == 0);
+}
+
 } // namespace
 
 
@@ -196,6 +207,90 @@ void initialize_home_adata()
     area_data[p].outer_map = game_data.destination_outer_map;
 }
 
+static optional<const MapDefData&> _find_map_from_deed(int item_id)
+{
+    auto id = the_item_db.get_id_from_legacy(item_id);
+
+    optional<int> map_id;
+    for (const auto& map : the_mapdef_db.values())
+    {
+        if (!map.deed)
+        {
+            continue;
+        }
+
+        if (id && *map.deed == *id)
+        {
+            map_id = map.legacy_id;
+            break;
+        }
+    }
+
+    if (!map_id)
+    {
+        txt("Cannot find map which is created by item '"s + inv[ci].id + "'."s,
+            Message::color(ColorIndex::red));
+        return none;
+    }
+
+    auto map = the_mapdef_db[*map_id];
+
+    if (!map)
+    {
+        txt("No such map '"s + *map_id + "'."s,
+            Message::color(ColorIndex::red));
+        return none;
+    }
+
+    return *map;
+}
+
+static TurnResult _build_new_home(int home_scale)
+{
+    game_data.home_scale = home_scale;
+    initialize_home_adata();
+
+    std::string midbk = mid;
+    mid = ""s + static_cast<int>(mdata_t::MapId::your_home) + u8"_"s + 101;
+    ctrl_file(FileOperation::map_delete_preserve_items);
+    mid = midbk;
+
+    map_global_prepare();
+
+    levelexitby = 2;
+    game_data.destination_map = static_cast<int>(mdata_t::MapId::your_home);
+    game_data.destination_dungeon_level = 1;
+    game_data.pc_x_in_world_map =
+        area_data[static_cast<int>(mdata_t::MapId::your_home)].position.x;
+    game_data.pc_y_in_world_map =
+        area_data[static_cast<int>(mdata_t::MapId::your_home)].position.y;
+
+    snd("core.build1");
+    txt(i18n::s.get("core.locale.building.built_new_house"),
+        Message::color{ColorIndex::green});
+    msg_halt();
+
+    snd("core.exitmap1");
+
+    return TurnResult::exit_map;
+}
+
+static int _find_free_area_slot()
+{
+    int area_ = -1;
+
+    for (int cnt = 300; cnt < 450; ++cnt)
+    {
+        if (area_data[cnt].id == mdata_t::MapId::none)
+        {
+            area_ = cnt;
+            break;
+        }
+    }
+
+    return area_;
+}
+
 TurnResult build_new_building()
 {
     if (map_data.type != mdata_t::MapType::world_map)
@@ -204,6 +299,7 @@ TurnResult build_new_building()
         update_screen();
         return TurnResult::pc_turn_user_error;
     }
+
     cell_featread(cdata.player().position.x, cdata.player().position.y);
     if (feat(0) != 0)
     {
@@ -211,108 +307,55 @@ TurnResult build_new_building()
         update_screen();
         return TurnResult::pc_turn_user_error;
     }
-    area = -1;
-    for (int cnt = 300; cnt < 450; ++cnt)
-    {
-        if (area_data[cnt].id == mdata_t::MapId::none)
-        {
-            area = cnt;
-            break;
-        }
-    }
+
+    area = _find_free_area_slot();
     if (area == -1)
     {
         txt(i18n::s.get("core.locale.building.cannot_build_anymore"));
         update_screen();
         return TurnResult::pc_turn_user_error;
     }
+
     txt(i18n::s.get("core.locale.building.really_build_it_here"));
-    rtval = yes_or_no(promptx, prompty, 160);
-    if (rtval != 0)
+    if (!yes_no())
     {
         update_screen();
         return TurnResult::pc_turn_user_error;
     }
+
     if (inv[ci].id == 344)
     {
-        game_data.home_scale = inv[ci].param1;
+        auto home_scale = inv[ci].param1;
         inv[ci].modify_number(-1);
-        initialize_home_adata();
-        std::string midbk = mid;
-        mid = ""s + 7 + u8"_"s + 101;
-        ctrl_file(FileOperation::map_delete_preserve_items);
-        mid = midbk;
-        map_global_prepare();
-        levelexitby = 2;
-        game_data.destination_map = 7;
-        game_data.destination_dungeon_level = 1;
-        game_data.pc_x_in_world_map = area_data[7].position.x;
-        game_data.pc_y_in_world_map = area_data[7].position.y;
-        snd("core.build1");
-        txt(i18n::s.get("core.locale.building.built_new_house"),
-            Message::color{ColorIndex::green});
-        msg_halt();
-        snd("core.exitmap1");
-        return TurnResult::exit_map;
+
+        return _build_new_home(home_scale);
     }
+
     ctrl_file(FileOperation::temp_dir_delete_area);
     p = area;
-    area_data[p].position.x = cdata.player().position.x;
-    area_data[p].position.y = cdata.player().position.y;
-    area_data[p].type = static_cast<int>(mdata_t::MapType::player_owned);
-    area_data[p].is_generated_every_time = false;
-    area_data[p].default_ai_calm = 0;
-    area_data[p].tile_type = 3;
-    area_data[p].turn_cost_base = 10000;
-    area_data[p].danger_level = 1;
-    area_data[p].deepest_level = 1;
-    area_data[p].tile_set = 1;
-    area_data[p].entrance = 8;
-    area_data[p].outer_map = game_data.destination_outer_map;
-    if (inv[ci].id == 521)
+
+    // Find the map which is generated by the deed and generate the map's area
+    // from it.
+    optional<const MapDefData&> map = _find_map_from_deed(inv[ci].id);
+
+    if (!map)
     {
-        area_data[p].id = static_cast<int>(mdata_t::MapId::museum);
-        area_data[p].appearance = 151;
-        area_data[p].is_indoor = true;
+        return TurnResult::pc_turn_user_error;
     }
-    if (inv[ci].id == 522)
-    {
-        area_data[p].id = static_cast<int>(mdata_t::MapId::shop);
-        area_data[p].appearance = 150;
-        area_data[p].is_indoor = true;
-    }
-    if (inv[ci].id == 542)
-    {
-        area_data[p].id = static_cast<int>(mdata_t::MapId::crop);
-        area_data[p].appearance = 152;
-        area_data[p].is_indoor = false;
-    }
-    if (inv[ci].id == 543)
-    {
-        area_data[p].id = static_cast<int>(mdata_t::MapId::storage_house);
-        area_data[p].appearance = 153;
-        area_data[p].is_indoor = true;
-    }
-    if (inv[ci].id == 572)
-    {
-        area_data[p].id = static_cast<int>(mdata_t::MapId::ranch);
-        area_data[p].appearance = 154;
-        area_data[p].is_indoor = false;
-        area_data[p].default_ai_calm = 1;
-    }
-    if (inv[ci].id == 712)
-    {
-        area_data[p].id = static_cast<int>(mdata_t::MapId::your_dungeon);
-        area_data[p].appearance = 138;
-        area_data[p].is_indoor = true;
-        area_data[p].default_ai_calm = 1;
-    }
+
+    auto& area = area_data[p];
+    auto pos = cdata.player().position;
+    area_generate_from_mapdef(
+        area, *map, game_data.destination_outer_map, pos.x, pos.y);
+
     s = i18n::s.get_enum("core.locale.building.names", inv[ci].id);
     snd("core.build1");
     txt(i18n::s.get("core.locale.building.built_new", s(0)),
         Message::color{ColorIndex::orange});
+
     map_global_prepare();
     inv[ci].modify_number(-1);
+
     return TurnResult::turn_end;
 }
 
@@ -600,7 +643,7 @@ void prompt_hiring()
         {
             snd("core.paygold1");
             cdata.player().gold -= calchirecost(tc) * 20;
-            await(Config::instance().animewait * 10);
+            await(Config::instance().animation_wait * 10);
             cdata[tc].set_state(Character::State::alive);
             txt(i18n::s.get(
                     "core.locale.building.home.hire.you_hire", cdata[tc]),
@@ -629,7 +672,8 @@ void fill_tile(int x, int y, int from, int to)
     if (cell_data.at(x, y).chip_id_actual != from)
         return;
 
-    if ((chipm(7, to) & 4) != 0 && cell_data.at(x, y).chara_index_plus_one != 0)
+    if ((chip_data[to].effect & 4) != 0 &&
+        cell_data.at(x, y).chara_index_plus_one != 0)
         return;
 
     // Draw one tile.
@@ -660,7 +704,7 @@ void start_home_map_mode()
     tile = 0;
     while (1)
     {
-        await(Config::instance().wait1);
+        await(Config::instance().general_wait);
         int stat = target_position();
         if (stat == -1)
         {
@@ -678,7 +722,7 @@ void start_home_map_mode()
                     tile);
             }
         }
-        else if (chipm(7, tile) & 4)
+        else if (chip_data[tile].effect & 4)
         {
             efid = 438;
             magic();
@@ -725,9 +769,17 @@ void show_home_value()
     ++cmbg;
     x = ww / 5 * 2;
     y = wh - 80;
-    pos(wx + ww / 4, wy + wh / 2);
-    gmode(4, 50);
-    gcopy_c(4, cmbg / 4 % 4 * 180, cmbg / 4 / 4 % 2 * 300, 180, 300, x, y);
+    gmode(2, 50);
+    gcopy_c(
+        4,
+        cmbg / 4 % 4 * 180,
+        cmbg / 4 / 4 % 2 * 300,
+        180,
+        300,
+        wx + ww / 4,
+        wy + wh / 2,
+        x,
+        y);
     gmode(2);
     calc_home_rank();
     s(0) = i18n::s.get("core.locale.building.home.rank.type.base");
@@ -743,8 +795,7 @@ void show_home_value()
         x = wx + 45 + cnt / 2 * 190;
         y = wy + 68 + cnt % 2 * 18;
         font(12 + sizefix - en * 2);
-        pos(x, y);
-        mes(s(cnt));
+        mes(x, y, s(cnt));
         font(14 - en * 2);
         for (int cnt = 0, cnt_end = cnt + (clamp(p(cnt) / 1000, 1, 10));
              cnt < cnt_end;
@@ -762,7 +813,7 @@ void show_home_value()
     sort_list_by_column1();
     for (int cnt = 0; cnt < 10; ++cnt)
     {
-        p = list(0, cnt);
+        p = list(0, 10 - cnt - 1);
         if (p == 0)
         {
             continue;
@@ -771,11 +822,11 @@ void show_home_value()
         draw_item_with_portrait_scale_height(
             inv[p], wx + 37, cnt * 16 + wy + 138);
 
-        pos(wx + 68, cnt * 16 + wy + 138);
-        mes(i18n::s.get(
-            "core.locale.building.home.rank.place", cnvrank(10 - cnt)));
-        pos(wx + 110, cnt * 16 + wy + 138);
-        mes(itemname(p));
+        mes(wx + 68,
+            cnt * 16 + wy + 138,
+            i18n::s.get(
+                "core.locale.building.home.rank.place", cnvrank(cnt + 1)));
+        mes(wx + 110, cnt * 16 + wy + 138, itemname(p));
     }
 
     while (1)
@@ -789,12 +840,12 @@ void show_home_value()
     }
 }
 
+
+
 void prompt_move_ally()
 {
-    int tchome = 0;
     while (true)
     {
-
         Message::instance().linebreak();
         txt(i18n::s.get("core.locale.building.home.move.who"));
         int stat = show_hire_menu(HireOperation::move);
@@ -811,39 +862,43 @@ void prompt_move_ally()
                 Message::color{ColorIndex::cyan});
             break;
         }
-        tchome = stat;
+        const auto tchome = stat;
         tc = stat;
         snd("core.ok1");
-    label_1718_internal:
-        Message::instance().linebreak();
-        txt(i18n::s.get("core.locale.building.home.move.where", cdata[stat]));
+        while (true)
         {
+            Message::instance().linebreak();
+            txt(i18n::s.get(
+                "core.locale.building.home.move.where", cdata[stat]));
             int stat = target_position();
             if (stat == -1)
             {
                 continue;
             }
-        }
-        if (chipm(7, cell_data.at(tlocx, tlocy).chip_id_actual) & 4 ||
-            cell_data.at(tlocx, tlocy).chara_index_plus_one != 0)
-        {
-            txt(i18n::s.get("core.locale.building.home.move.invalid"));
-            goto label_1718_internal;
+            if (chip_data.for_cell(tlocx, tlocy).effect & 4 ||
+                cell_data.at(tlocx, tlocy).chara_index_plus_one != 0)
+            {
+                txt(i18n::s.get("core.locale.building.home.move.invalid"));
+            }
+            else
+            {
+                break;
+            }
         }
         tc = tchome;
         cell_data.at(cdata[tc].position.x, cdata[tc].position.y)
             .chara_index_plus_one = 0;
         cell_data.at(tlocx, tlocy).chara_index_plus_one = tc + 1;
-        cdata[tc].position.x = tlocx;
-        cdata[tc].initial_position.x = tlocx;
-        cdata[tc].position.y = tlocy;
-        cdata[tc].initial_position.y = tlocy;
+        cdata[tc].position = cdata[tc].initial_position =
+            Position{tlocx, tlocy};
         cdata[tc].continuous_action.finish();
         Message::instance().linebreak();
         txt(i18n::s.get("core.locale.building.home.move.is_moved", cdata[tc]));
         snd("core.foot");
     }
 }
+
+
 
 void prompt_ally_staying()
 {
@@ -939,7 +994,7 @@ void show_shop_log()
     int shoplv = 0;
     int customer = 0;
     int dblistmax = 0;
-    worker = getworker(area);
+    const auto worker = getworker(area);
     std::string shop_mark =
         u8"["s + i18n::s.get("core.locale.building.shop.info") + u8"]"s;
     if (worker == -1)
@@ -1156,7 +1211,7 @@ void show_shop_log()
     }
     if (sold == 0)
     {
-        if (!Config::instance().hideshopresult)
+        if (!Config::instance().hide_shop_updates)
         {
             txt(shop_mark +
                 i18n::s.get(
@@ -1167,7 +1222,7 @@ void show_shop_log()
     }
     else
     {
-        if (!Config::instance().hideshopresult)
+        if (!Config::instance().hide_shop_updates)
         {
             s = i18n::s.get("core.locale.building.shop.log.gold", income(0));
             if (income(1) != 0)
@@ -1407,69 +1462,55 @@ void calc_home_rank()
 
 void update_ranch()
 {
-    worker = getworker(game_data.current_map);
-    livestock = 0;
-    for (auto&& cnt : cdata.all())
+    int livestock_count = 0;
+    for (auto&& chara : cdata.all())
     {
-        if (cnt.state() != Character::State::alive)
+        if (chara.state() == Character::State::alive && chara.is_livestock())
         {
-            continue;
+            ++livestock_count;
         }
-        if (cnt.is_livestock() == 0)
-        {
-            continue;
-        }
-        ++livestock;
     }
-    for (int cnt = 0, cnt_end = (renewmulti); cnt < cnt_end; ++cnt)
+
+    const auto worker = getworker(game_data.current_map);
+    for (int i = 0; i < renewmulti; ++i)
     {
-        if (worker == -1)
+        if (worker != -1 &&
+            _livestock_will_breed(cdata[worker], livestock_count))
         {
-            goto label_1734_internal;
-        }
-        if (rnd(5000) >
-            chara_breed_power(cdata[worker]) * 100 / (100 + livestock * 20) -
-                livestock * 2)
-        {
-            if (livestock != 0 || rnd(30) != 0)
+            flt(calcobjlv(cdata[worker].level), Quality::bad);
+            if (rnd(2))
             {
-                goto label_1734_internal;
+                dbid = cdata[worker].id;
             }
-        }
-        flt(calcobjlv(cdata[worker].level), Quality::bad);
-        if (rnd(2))
-        {
-            dbid = cdata[worker].id;
-        }
-        else
-        {
-            dbid = 0;
-        }
-        if (rnd(10) != 0)
-        {
-            fltnrace = cdatan(2, worker);
-        }
-        if (cdata[worker].id == 319)
-        {
-            dbid = 176;
-        }
-        {
+            else
+            {
+                dbid = 0;
+            }
+            if (rnd(10) != 0)
+            {
+                fltnrace = cdatan(2, worker);
+            }
+            if (cdata[worker].id == 319)
+            {
+                // Little sister -> younger sister
+                dbid = 176;
+            }
             int stat = chara_create(-1, dbid, 4 + rnd(11), 4 + rnd(8));
             if (stat != 0)
             {
                 cdata[rc].is_livestock() = true;
-                ++livestock;
+                ++livestock_count;
             }
         }
-    label_1734_internal:
-        egg = 0;
-        for (auto&& cnt : cdata.all())
+
+        int egg_or_milk_count = 0;
+        for (auto&& chara : cdata.all())
         {
-            if (cnt.state() != Character::State::alive)
+            if (chara.state() != Character::State::alive)
             {
                 continue;
             }
-            if (cnt.is_livestock() == 0)
+            if (!chara.is_livestock())
             {
                 continue;
             }
@@ -1479,118 +1520,87 @@ void update_ranch()
             {
                 continue;
             }
-            flt(calcobjlv(cnt.level), Quality::good);
-            p = rnd(5);
-            f = 0;
-            if (rnd(egg + 1) > 2)
+            flt(calcobjlv(chara.level), Quality::good);
+            if (rnd(egg_or_milk_count + 1) > 2)
             {
                 continue;
             }
-            if (livestock > 10)
+            if (livestock_count > 10)
             {
                 if (rnd(4) == 0)
                 {
                     continue;
                 }
             }
-            if (livestock > 20)
+            if (livestock_count > 20)
             {
                 if (rnd(4) == 0)
                 {
                     continue;
                 }
             }
-            if (livestock > 30)
+            if (livestock_count > 30)
             {
                 if (rnd(4) == 0)
                 {
                     continue;
                 }
             }
-            if (livestock > 40)
+            if (livestock_count > 40)
             {
                 if (rnd(4) == 0)
                 {
                     continue;
                 }
             }
-            if (p == 0)
+            switch (rnd(5))
             {
-                if (rnd(60) == 0)
+            case 0:
+                // Egg
+                if (rnd(60) == 0 ||
+                    (cdatan(2, chara.index) == "core.chicken" && rnd(20) == 0))
                 {
-                    f = 1;
-                }
-                if (cdatan(2, cnt.index) == u8"core.chicken"s)
-                {
-                    if (rnd(20) == 0)
-                    {
-                        f = 1;
-                    }
-                }
-                if (f)
-                {
-                    ++egg;
+                    ++egg_or_milk_count;
                     int stat = itemcreate(-1, 573, x, y, 0);
                     if (stat)
                     {
-                        inv[ci].subname = cnt.id;
-                        inv[ci].weight = cnt.weight * 10 + 250;
-                        inv[ci].value =
-                            clamp(cnt.weight * cnt.weight / 10000, 200, 40000);
+                        inv[ci].subname = chara.id;
+                        inv[ci].weight = chara.weight * 10 + 250;
+                        inv[ci].value = clamp(
+                            chara.weight * chara.weight / 10000, 200, 40000);
                     }
                 }
-                continue;
-            }
-            if (p == 1)
-            {
-                if (rnd(60) == 0)
+                break;
+            case 1:
+                // Milk
+                if (rnd(60) == 0 ||
+                    (cdatan(2, chara.index) == "core.sheep" && rnd(20) == 0))
                 {
-                    f = 1;
-                }
-                if (cdatan(2, cnt.index) == u8"core.sheep"s)
-                {
-                    if (rnd(20) == 0)
-                    {
-                        f = 1;
-                    }
-                }
-                if (f)
-                {
-                    ++egg;
+                    ++egg_or_milk_count;
                     int stat = itemcreate(-1, 574, x, y, 0);
                     if (stat)
                     {
-                        inv[ci].subname = cnt.id;
+                        inv[ci].subname = chara.id;
                     }
                 }
-                continue;
-            }
-            if (p == 2)
-            {
+                break;
+            case 2:
+                // Shit
                 if (rnd(80) == 0)
-                {
-                    f = 1;
-                }
-                if (f)
                 {
                     int stat = itemcreate(-1, 575, x, y, 0);
                     if (stat)
                     {
-                        inv[ci].subname = cnt.id;
-                        inv[ci].weight = cnt.weight * 40 + 300;
+                        inv[ci].subname = chara.id;
+                        inv[ci].weight = chara.weight * 40 + 300;
                         inv[ci].value =
-                            clamp(cnt.weight * cnt.weight / 5000, 1, 20000);
+                            clamp(chara.weight * chara.weight / 5000, 1, 20000);
                     }
                 }
-                continue;
-            }
-            if (p == 3)
-            {
+                break;
+            case 3:
+                // Garbage
                 if (rnd(80) == 0)
-                {
-                    f = 1;
-                }
-                if (f)
                 {
                     dbid = 222;
                     if (rnd(2))
@@ -1599,12 +1609,13 @@ void update_ranch()
                     }
                     itemcreate(-1, dbid, x, y, 0);
                 }
-                continue;
+                break;
+            case 4:
+                // Do nothing.
+                break;
             }
         }
     }
 }
-
-
 
 } // namespace elona

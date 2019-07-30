@@ -47,6 +47,9 @@
 namespace
 {
 
+int dbg_freemove;
+
+
 
 template <typename F>
 bool any_of_characters_around_you(F predicate, bool ignore_pc = true)
@@ -364,8 +367,8 @@ TurnResult do_dig_command()
             return TurnResult::turn_end;
         }
     }
-    if ((chipm(7, cell_data.at(x, y).chip_id_actual) & 4) == 0 ||
-        chipm(0, cell_data.at(x, y).chip_id_actual) == 3 ||
+    if ((chip_data.for_cell(x, y).effect & 4) == 0 ||
+        chip_data.for_cell(x, y).kind == 3 ||
         map_data.type == mdata_t::MapType::world_map)
     {
         txt(i18n::s.get("core.locale.common.it_is_impossible"));
@@ -629,8 +632,7 @@ TurnResult do_throw_command()
                 {
                     if (y < map_data.height)
                     {
-                        if ((chipm(7, cell_data.at(x, y).chip_id_actual) & 4) ==
-                            0)
+                        if ((chip_data.for_cell(x, y).effect & 4) == 0)
                         {
                             tlocx = x;
                             tlocy = y;
@@ -644,17 +646,18 @@ TurnResult do_throw_command()
         {tlocx, tlocy}, cdata[cc].position, inv[ci].image, inv[ci].color)
         .play();
     ti = inv_getfreeid(-1);
-    inv[ci].modify_number(-1);
-    if (inv[ci].id == 685)
+    if (inv[ci].id == 685 && ti != -1)
     {
-        if (ti != -1)
-        {
-            item_copy(ci, ti);
-            inv[ti].set_number(1);
-            inv[ti].position.x = tlocx;
-            inv[ti].position.y = tlocy;
-            ci = ti;
-        }
+        item_copy(ci, ti);
+        inv[ti].position.x = tlocx;
+        inv[ti].position.y = tlocy;
+        inv[ti].set_number(1);
+        inv[ci].modify_number(-1);
+        ci = ti;
+    }
+    else
+    {
+        inv[ci].modify_number(-1);
     }
     if (cc == 0)
     {
@@ -830,7 +833,7 @@ TurnResult do_throw_command()
             }
             if (inv[ci].id == 587)
             {
-                if (chipm(0, cell_data.at(tlocx, tlocy).chip_id_actual) == 4)
+                if (chip_data.for_cell(tlocx, tlocy).kind == 4)
                 {
                     return TurnResult::turn_end;
                 }
@@ -1217,7 +1220,6 @@ label_1953_internal:
                         sy = (dy - scy) * inf_tiles + inf_screeny;
                         if (sy + inf_tiles <= windowh - inf_verh)
                         {
-                            pos(sx, sy * (sy > 0));
                             snail::Application::instance()
                                 .get_renderer()
                                 .set_blend_mode(snail::BlendMode::blend);
@@ -1243,7 +1245,6 @@ label_1953_internal:
                 sy = y * inf_tiles + inf_screeny;
                 if (sy + inf_tiles <= windowh - inf_verh)
                 {
-                    pos(sx, sy * (sy > 0));
                     snail::Application::instance()
                         .get_renderer()
                         .set_blend_mode(snail::BlendMode::blend);
@@ -1264,7 +1265,6 @@ label_1953_internal:
                 y * inf_tiles + inf_screeny - 12,
                 cnt);
         }
-        color(0, 0, 0);
         txttargetnpc(
             cdata[list(0, i)].position.x, cdata[list(0, i)].position.y);
         cs_bk = cs;
@@ -1555,6 +1555,8 @@ TurnResult do_dip_command()
     return TurnResult::turn_end;
 }
 
+
+
 TurnResult do_use_command()
 {
     screenupdate = -1;
@@ -1762,7 +1764,7 @@ TurnResult do_use_command()
         cell_featset(x, y, 0, 14, 7, cc);
         txt(i18n::s.get("core.locale.action.use.mine.you_set_up"));
         snd("core.build1");
-        goto label_2229_internal;
+        break;
     case 44:
         if (inv_getowner(ci) != -1)
         {
@@ -1793,7 +1795,7 @@ TurnResult do_use_command()
                 int stat = prompt.query(promptx, prompty, 260);
                 if (stat == -1)
                 {
-                    goto label_2229_internal;
+                    break;
                 }
                 rtval = stat;
             }
@@ -1801,29 +1803,29 @@ TurnResult do_use_command()
         if (rtval == 0)
         {
             txt(i18n::s.get("core.locale.action.use.chair.relax"));
-            goto label_2229_internal;
+            break;
         }
         if (rtval == 1)
         {
             txt(i18n::s.get("core.locale.action.use.chair.my_chair", inv[ci]));
             inv[ci].param1 = 1;
-            goto label_2229_internal;
+            break;
         }
         if (rtval == 2)
         {
             txt(i18n::s.get(
                 "core.locale.action.use.chair.guest_chair", inv[ci]));
             inv[ci].param1 = 2;
-            goto label_2229_internal;
+            break;
         }
         if (rtval == 3)
         {
             txt(i18n::s.get(
                 "core.locale.action.use.chair.free_chair", inv[ci]));
             inv[ci].param1 = 0;
-            goto label_2229_internal;
+            break;
         }
-        goto label_2229_internal;
+        break;
     case 8:
         if (map_data.type != mdata_t::MapType::player_owned)
         {
@@ -1878,15 +1880,15 @@ TurnResult do_use_command()
     case 15:
         efid = 184;
         magic();
-        goto label_2229_internal;
+        break;
     case 16:
         efid = 185;
         magic();
-        goto label_2229_internal;
+        break;
     case 17:
         efid = 183;
         magic();
-        goto label_2229_internal;
+        break;
     case 14:
         if (cc == 0)
         {
@@ -1907,7 +1909,7 @@ TurnResult do_use_command()
             txt(i18n::s.get(
                 "core.locale.action.use.snow.make_snowman", cdata[cc]));
         }
-        goto label_2229_internal;
+        break;
     case 13:
         snd("core.fire1");
         if (game_data.torch == 0)
@@ -1921,7 +1923,7 @@ TurnResult do_use_command()
             txt(i18n::s.get("core.locale.action.use.torch.put_out"));
         }
         chara_refresh(0);
-        goto label_2229_internal;
+        break;
     case 9:
     {
         int stat = read_textbook();
@@ -1935,7 +1937,7 @@ TurnResult do_use_command()
             return TurnResult::pc_turn_user_error;
         }
     }
-        goto label_2229_internal;
+    break;
     case 5:
         txt(i18n::s.get("core.locale.action.use.stethoscope.prompt"));
         update_screen();
@@ -2021,7 +2023,7 @@ TurnResult do_use_command()
                                 cell_refresh(
                                     inv[ci].position.x, inv[ci].position.y);
                                 refresh_burden_state();
-                                goto label_2229_internal;
+                                break;
                             }
                         }
                         cdata[tc].is_leashed() = true;
@@ -2055,7 +2057,7 @@ TurnResult do_use_command()
         {
             txt(i18n::s.get("core.locale.common.it_is_impossible"));
         }
-        goto label_2229_internal;
+        break;
     case 45:
         if (game_data.current_map == mdata_t::MapId::show_house)
         {
@@ -2120,7 +2122,7 @@ TurnResult do_use_command()
         {
             txt(i18n::s.get("core.locale.common.it_is_impossible"));
         }
-        goto label_2229_internal;
+        break;
     case 6:
     {
         txt(i18n::s.get("core.locale.action.use.music_disc.play", inv[ci]));
@@ -2135,11 +2137,11 @@ TurnResult do_use_command()
         assert(music_id);
         if (!music_id)
         {
-            goto label_2229_internal;
+            break;
         }
         play_music(*music_id);
     }
-        goto label_2229_internal;
+    break;
     case 10:
         screenupdate = -1;
         update_screen();
@@ -2176,8 +2178,7 @@ TurnResult do_use_command()
                 {
                     txt(i18n::s.get(
                         "core.locale.action.use.shelter.during_quest"));
-                    rtval = yes_or_no(promptx, prompty, 160);
-                    if (rtval != 0)
+                    if (!yes_no())
                     {
                         update_screen();
                         return TurnResult::pc_turn_user_error;
@@ -2187,7 +2188,7 @@ TurnResult do_use_command()
         }
         game_data.continuous_action_about_to_start = 102;
         continuous_action_others();
-        goto label_2229_internal;
+        break;
     case 11:
         if (moneybox(inv[ci].param2) > cdata.player().gold)
         {
@@ -2207,35 +2208,35 @@ TurnResult do_use_command()
         cdata.player().gold -= moneybox(inv[ci].param2);
         inv[ci].param1 += moneybox(inv[ci].param2);
         inv[ci].weight += 100;
-        goto label_2229_internal;
+        break;
     case 20:
         efid = 458;
         efp = 400;
         magic();
-        goto label_2229_internal;
+        break;
     case 47:
         txt(i18n::s.get("core.locale.action.use.summoning_crystal.use"));
-        goto label_2229_internal;
+        break;
     case 22:
         snd("core.enc");
         if (map_data.type != mdata_t::MapType::town &&
             map_data.type != mdata_t::MapType::guild)
         {
             txt(i18n::s.get("core.locale.action.use.rune.only_in_town"));
-            goto label_2229_internal;
+            break;
         }
         inv[ci].modify_number(-1);
         cell_refresh(inv[ci].position.x, inv[ci].position.y);
         txt(i18n::s.get("core.locale.action.use.rune.use"));
         // Showroom is not supported now.
-        goto label_2229_internal;
+        break;
     case 49:
         txt(i18n::s.get("core.locale.action.use.hammer.use", inv[ci]));
         snd("core.build1");
         efid = 49;
         efp = 100;
         magic();
-        goto label_2229_internal;
+        break;
     case 21:
         txt(i18n::s.get("core.locale.action.use.hammer.use", inv[ci]));
         snd("core.build1");
@@ -2244,21 +2245,21 @@ TurnResult do_use_command()
         efid = 21;
         efp = 500;
         magic();
-        goto label_2229_internal;
+        break;
     case 25:
         txt(i18n::s.get("core.locale.action.use.unicorn_horn.use", inv[ci]));
         inv[ci].modify_number(-1);
         efid = 637;
         efp = 500;
         magic();
-        goto label_2229_internal;
+        break;
     case 26:
         txt(i18n::s.get("core.locale.action.use.statue.activate", inv[ci]));
         game_data.diastrophism_flag = 1;
         snd("core.pray1");
         txt(i18n::s.get("core.locale.action.use.statue.opatos"),
             Message::color{ColorIndex::orange});
-        goto label_2229_internal;
+        break;
     case 34:
         txt(i18n::s.get("core.locale.action.use.statue.activate", inv[ci]));
         txt(i18n::s.get("core.locale.action.use.statue.jure"),
@@ -2266,14 +2267,14 @@ TurnResult do_use_command()
         efid = 637;
         efp = 5000;
         magic();
-        goto label_2229_internal;
+        break;
     case 43:
         txt(i18n::s.get("core.locale.action.use.statue.activate", inv[ci]));
         snd("core.pray1");
         txt(i18n::s.get("core.locale.action.use.statue.ehekatl"),
             Message::color{ColorIndex::orange});
         buff_add(cdata[tc], "core.luck", 77, 2500);
-        goto label_2229_internal;
+        break;
     case 27:
         txt(i18n::s.get("core.locale.action.use.statue.activate", inv[ci]));
         snd("core.pray1");
@@ -2282,7 +2283,7 @@ TurnResult do_use_command()
             txt(i18n::s.get(
                     "core.locale.action.use.statue.lulwy.during_etherwind"),
                 Message::color{ColorIndex::orange});
-            goto label_2229_internal;
+            break;
         }
         p = game_data.weather;
         while (1)
@@ -2312,7 +2313,7 @@ TurnResult do_use_command()
             Message::color{ColorIndex::orange});
         txt(i18n::s.get("core.locale.action.weather.changes"));
         sound_play_environmental();
-        goto label_2229_internal;
+        break;
     case 28:
         if (map_data.type == mdata_t::MapType::world_map)
         {
@@ -2325,8 +2326,7 @@ TurnResult do_use_command()
             if (game_data.quest_flags.red_blossom_in_palmia == 1)
             {
                 txt(i18n::s.get("core.locale.action.use.nuke.not_quest_goal"));
-                rtval = yes_or_no(promptx, prompty, 160);
-                if (rtval != 0)
+                if (!yes_no())
                 {
                     update_screen();
                     return TurnResult::pc_turn_user_error;
@@ -2339,16 +2339,16 @@ TurnResult do_use_command()
         snd("core.build1");
         mef_add(
             cdata[cc].position.x, cdata[cc].position.y, 7, 632, 10, 100, cc);
-        goto label_2229_internal;
+        break;
     case 48:
         if (game_data.current_map != mdata_t::MapId::show_house ||
             usermapid == 0)
         {
             txt(i18n::s.get("core.locale.action.use.statue.creator.normal"));
-            goto label_2229_internal;
+            break;
         }
         txt(i18n::s.get("core.locale.action.use.statue.creator.in_usermap"));
-        goto label_2229_internal;
+        break;
     case 29:
         trait(inv[ci].param1) = 1;
         if (inv[ci].param1 == 169)
@@ -2363,7 +2363,7 @@ TurnResult do_use_command()
         txt(i18n::s.get("core.locale.action.use.secret_treasure.use"));
         animeload(10, 0);
         chara_refresh(cc);
-        goto label_2229_internal;
+        break;
     case 30:
         txt(i18n::s.get("core.locale.action.use.statue.activate", inv[ci]));
         efid = inv[ci].param1;
@@ -2371,7 +2371,7 @@ TurnResult do_use_command()
         tc = cc;
         efstatus = CurseState::none;
         magic();
-        goto label_2229_internal;
+        break;
     case 41:
         if (game_data
                 .next_level_minus_one_kumiromis_experience_becomes_available >
@@ -2393,33 +2393,32 @@ TurnResult do_use_command()
         txt(i18n::s.get(
                 "core.locale.action.use.secret_experience.kumiromi.use.text"),
             Message::color{ColorIndex::orange});
-        goto label_2229_internal;
+        break;
     case 42:
         snd("core.curse1");
         txt(i18n::s.get("core.locale.action.use.secret_experience.lomias"),
             Message::color{ColorIndex::purple});
-        goto label_2229_internal;
+        break;
     case 46:
         Message::instance().linebreak();
         txt(i18n::s.get("core.locale.action.use.rope.prompt"));
-        rtval = yes_or_no(promptx, prompty, 160);
-        if (rtval != 0)
+        if (!yes_no())
         {
             return TurnResult::turn_end;
         }
         damage_hp(cdata.player(), 99999, -20);
-        goto label_2229_internal;
+        break;
     case 33:
         if (inv[ci].subname == 0)
         {
             txt(i18n::s.get("core.locale.action.use.monster_ball.empty"));
-            goto label_2229_internal;
+            break;
         }
         if (chara_get_free_slot_ally() == 0)
         {
             txt(i18n::s.get(
                 "core.locale.action.use.monster_ball.party_is_full"));
-            goto label_2229_internal;
+            break;
         }
         txt(i18n::s.get("core.locale.action.use.monster_ball.use", inv[ci]));
         inv[ci].modify_number(-1);
@@ -2428,7 +2427,7 @@ TurnResult do_use_command()
         chara_create(56, inv[ci].subname, -3, 0);
         rc = 56;
         new_ally_joins();
-        goto label_2229_internal;
+        break;
     case 31:
         x = cdata[cc].position.x;
         y = cdata[cc].position.y;
@@ -2437,13 +2436,13 @@ TurnResult do_use_command()
         {
             txt(i18n::s.get(
                 "core.locale.action.use.gem_stone.kumiromi.no_plant"));
-            goto label_2229_internal;
+            break;
         }
         if (feat == tile_plant + 2)
         {
             txt(i18n::s.get(
                 "core.locale.action.use.gem_stone.kumiromi.already_grown"));
-            goto label_2229_internal;
+            break;
         }
         if (feat == tile_plant + 3)
         {
@@ -2459,7 +2458,7 @@ TurnResult do_use_command()
         }
         cell_featset(x, y, feat, feat(1), feat(2), feat(3));
         animeload(8, 0);
-        goto label_2229_internal;
+        break;
     case 32:
         Message::instance().linebreak();
         txt(i18n::s.get("core.locale.action.use.gene_machine.choose_original"));
@@ -2504,8 +2503,7 @@ TurnResult do_use_command()
             "core.locale.action.use.gene_machine.prompt",
             cdata[tc],
             cdata[rc]));
-        rtval = yes_or_no(promptx, prompty, 160);
-        if (rtval != 0)
+        if (!yes_no())
         {
             return TurnResult::turn_end;
         }
@@ -2586,7 +2584,7 @@ TurnResult do_use_command()
             }
         }
         chara_vanquish(tc);
-        autosave = 1 * (game_data.current_map != mdata_t::MapId::show_house);
+        save_set_autosave();
         chara_gain_skill_exp(cdata.player(), 151, 1200);
         randomize();
         screenupdate = -1;
@@ -2595,7 +2593,7 @@ TurnResult do_use_command()
         snd("core.pop2");
         menu_character_sheet_investigate();
         cc = 0;
-        goto label_2229_internal;
+        break;
     case 35:
         txt(i18n::s.get("core.locale.action.use.iron_maiden.use"));
         txt(i18n::s.get("core.locale.action.use.iron_maiden.interesting"),
@@ -2605,7 +2603,7 @@ TurnResult do_use_command()
         txt(i18n::s.get("core.locale.action.use.iron_maiden.grin"),
             Message::color{ColorIndex::cyan});
         damage_hp(cdata.player(), 9999, -18);
-        goto label_2229_internal;
+        break;
     case 36:
         txt(i18n::s.get("core.locale.action.use.guillotine.use"));
         txt(i18n::s.get("core.locale.action.use.iron_maiden.interesting"),
@@ -2614,18 +2612,20 @@ TurnResult do_use_command()
         txt(i18n::s.get("core.locale.action.use.iron_maiden.grin"),
             Message::color{ColorIndex::cyan});
         damage_hp(cdata.player(), 9999, -19);
-        goto label_2229_internal;
+        break;
     case 39:
         txt(i18n::s.get("core.locale.action.use.whistle.use"),
             Message::color{ColorIndex::cyan});
         make_sound(cdata[cc].position.x, cdata[cc].position.y, 10, 1, 1, cc);
-        goto label_2229_internal;
-    case 37: show_card_collection(); goto label_2229_internal;
+        break;
+    case 37: show_card_collection(); break;
     }
-label_2229_internal:
+
     refresh_burden_state();
     return TurnResult::turn_end;
 }
+
+
 
 TurnResult do_open_command(bool play_sound)
 {
@@ -2837,7 +2837,7 @@ TurnResult do_use_stairs_command(int val0)
         txt(i18n::s.get("core.locale.action.use_stairs.cannot_during_debug"));
         return TurnResult::pc_turn_user_error;
     }
-    int stat = item_find(631, 3, -1);
+    int stat = item_find(631, 3, ItemFindLocation::ground);
     if (stat != -1)
     {
         if (map_is_town_or_guild())
@@ -2853,8 +2853,7 @@ TurnResult do_use_stairs_command(int val0)
         if (mapitemfind(cdata[cc].position.x, cdata[cc].position.y, 753) != -1)
         {
             txt(i18n::s.get("core.locale.action.use_stairs.kotatsu.prompt"));
-            rtval = yes_or_no(promptx, prompty, 160);
-            if (rtval != 0)
+            if (!yes_no())
             {
                 update_screen();
                 return TurnResult::pc_turn_user_error;
@@ -3008,8 +3007,7 @@ TurnResult do_use_stairs_command(int val0)
             {
                 txt(i18n::s.get(
                     "core.locale.action.use_stairs.prompt_give_up_quest"));
-                rtval = yes_or_no(promptx, prompty, 160);
-                if (rtval != 0)
+                if (!yes_no())
                 {
                     update_screen();
                     return TurnResult::pc_turn_user_error;
@@ -3263,9 +3261,9 @@ TurnResult do_movement_command()
                         "core.locale.action.move.leave.abandoning_quest"));
                 }
             }
-            rtval = yes_or_no(promptx, prompty, 160);
+            const auto yesno_result = yes_no();
             update_screen();
-            if (rtval == 0)
+            if (yesno_result)
             {
                 game_data.player_x_on_map_leave = cdata.player().position.x;
                 game_data.player_y_on_map_leave = cdata.player().position.y;
@@ -3473,18 +3471,15 @@ TurnResult do_get_command()
             }
             create_harvested_item();
             harvest_plant(
-                chipm(
-                    0,
-                    cell_data
-                        .at(cdata.player().position.x,
-                            cdata.player().position.y)
-                        .chip_id_actual) == 2
+                chip_data.for_cell(
+                             cdata.player().position.x,
+                             cdata.player().position.y)
+                            .kind == 2
                     ? 1
                     : 0);
             if (feat(2) == 40)
             {
-                autosave =
-                    1 * (game_data.current_map != mdata_t::MapId::show_house);
+                save_set_autosave();
             }
             refresh_burden_state();
             return TurnResult::turn_end;
@@ -3493,8 +3488,7 @@ TurnResult do_get_command()
             feat(2) + feat(3) * 100 >= 300 && feat(2) + feat(3) * 100 < 450)
         {
             txt(i18n::s.get("core.locale.action.get.building.prompt"));
-            rtval = yes_or_no(promptx, prompty, 160);
-            if (rtval != 0)
+            if (!yes_no())
             {
                 update_screen();
                 return TurnResult::pc_turn_user_error;
@@ -3515,11 +3509,10 @@ TurnResult do_get_command()
     if (number == 0)
     {
         if ((map_is_town_or_guild()) &&
-            chipm(
-                0,
-                cell_data
-                    .at(cdata.player().position.x, cdata.player().position.y)
-                    .chip_id_actual) == 4)
+            chip_data
+                    .for_cell(
+                        cdata.player().position.x, cdata.player().position.y)
+                    .kind == 4)
         {
             snd("core.foot2a");
             txt(i18n::s.get("core.locale.action.get.snow"));
