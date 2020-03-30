@@ -1,9 +1,16 @@
 {
   "ExpandedNodes": [
     "",
+    "\\runtime",
+    "\\runtime\\profile",
+    "\\runtime\\profile\\_",
+    "\\runtime\\profile\\_\\mod",
+    "\\runtime\\profile\\_\\mod\\core",
+    "\\runtime\\profile\\_\\mod\\core\\locale",
+    "\\runtime\\profile\\_\\mod\\core\\locale\\ko",
     "\\src",
-    "\\src\\elona"
+    "\\tools"
   ],
-  "SelectedNode": "\\src\\elona\\activity.cpp",
+  "SelectedNode": "\\runtime\\profile\\_\\mod\\core\\locale\\ko\\ability.hcl",
   "PreviewInSolutionExplorer": false
 }
